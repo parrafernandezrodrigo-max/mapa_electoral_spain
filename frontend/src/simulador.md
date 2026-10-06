@@ -207,7 +207,17 @@ const simResults = (() => {
     }
   }
 
-  // Simulate per province
+  // Baseline simulation: all parties competing solo (top5 only, no coalitions)
+  // Used as reference so the top5-truncation bias cancels out in deltas
+  const simByCandSolo = {};
+  for (const prov of Object.values(results[elecId] ?? {})) {
+    const voteMap = {};
+    for (const p of prov.top5_partidos ?? []) voteMap[p.siglas] = (p.votos ?? 0);
+    const won = dhondt(Object.entries(voteMap).map(([id, votes]) => ({ id, votes })), prov.seats_total ?? 0);
+    for (const [id, n] of Object.entries(won)) simByCandSolo[id] = (simByCandSolo[id] ?? 0) + n;
+  }
+
+  // Simulate per province with coalition merges
   const simByCand = {}; // candId -> seats nationally
   for (const prov of Object.values(results[elecId] ?? {})) {
     const voteMap = {};
@@ -227,39 +237,40 @@ const simResults = (() => {
   }
 
   // Coalition summary: for each active coalition + solo parties with seats
+  // Deltas compare coalition-sim vs solo-sim to cancel top5-truncation bias
   const coalSummary = [];
 
   for (const [letter, members] of Object.entries(activeCoals).sort()) {
-    const realTotal = members.reduce((s, sig) => s + (realByParty[sig] ?? 0), 0);
+    const baseTotal = members.reduce((s, sig) => s + (simByCandSolo[sig] ?? 0), 0);
     const simTotal  = simByCand[`coal:${letter}`] ?? 0;
     coalSummary.push({
       type: "coal", letter,
       label: `Coalición ${letter}`,
       members,
-      realTotal, simTotal,
-      delta: simTotal - realTotal,
+      realTotal: baseTotal, simTotal,
+      delta: simTotal - baseTotal,
     });
   }
 
-  // Solo parties (that won at least 1 seat in real or sim)
+  // Solo parties (that won at least 1 seat in baseline or coalition sim)
   for (const p of elecParties.list) {
     const coal = coalConfig[p.siglas] ?? "Solo";
     if (coal !== "Solo" && activeCoals[coal]) continue; // in an active coalition
-    const realS = realByParty[p.siglas] ?? 0;
+    const baseS = simByCandSolo[p.siglas] ?? 0;
     const simS  = simByCand[p.siglas] ?? 0;
-    if (realS > 0 || simS > 0) {
+    if (baseS > 0 || simS > 0) {
       coalSummary.push({
         type: "solo",
         label: p.siglas,
         bloque: p.bloque,
         members: [p.siglas],
-        realTotal: realS, simTotal: simS,
-        delta: simS - realS,
+        realTotal: baseS, simTotal: simS,
+        delta: simS - baseS,
       });
     }
   }
 
-  return { realByBlock, realByParty, simByCand, simByBlockOrCoal, activeCoals, coalSummary };
+  return { realByBlock, realByParty, simByCandSolo, simByCand, simByBlockOrCoal, activeCoals, coalSummary };
 })();
 ```
 
@@ -388,17 +399,17 @@ const summaryEl = (() => {
   if (Object.keys(activeCoals).length === 0) return null;
 
   const rows = coalSummary.map(entry => ({
-    "Grupo":          entry.type === "coal"
-                        ? `Coalición ${entry.letter}`
-                        : `${entry.label} (${bloquesMeta[entry.bloque]?.label ?? entry.bloque ?? "solo"})`,
-    "Partidos":       entry.members.join(" + "),
-    "Esc. reales":    entry.realTotal,
-    "Esc. simulados": entry.simTotal,
-    "Diferencia":     entry.delta,
+    "Grupo":            entry.type === "coal"
+                          ? `Coalición ${entry.letter}`
+                          : `${entry.label} (${bloquesMeta[entry.bloque]?.label ?? entry.bloque ?? "solo"})`,
+    "Partidos":         entry.members.join(" + "),
+    "Esc. sin coalición": entry.realTotal,
+    "Esc. simulados":   entry.simTotal,
+    "Diferencia":       entry.delta,
   }));
 
   return Inputs.table(rows, {
-    columns: ["Grupo","Partidos","Esc. reales","Esc. simulados","Diferencia"],
+    columns: ["Grupo","Partidos","Esc. sin coalición","Esc. simulados","Diferencia"],
     rows: 20,
     sort: "Diferencia",
     reverse: true,
@@ -432,14 +443,19 @@ const provinceEl = (() => {
   }
 
   const rows = Object.entries(results[elecId] ?? {}).map(([cp, prov]) => {
-    // Real seats per candidate group in this province
+    // Baseline simulation (all solo, top5 only) — reference to cancel top5-truncation bias
+    const soloVoteMap = {};
+    for (const p of prov.top5_partidos ?? []) soloVoteMap[p.siglas] = (p.votos ?? 0);
+    const soloProv = dhondt(Object.entries(soloVoteMap).map(([id, v]) => ({id, votes: v})), prov.seats_total ?? 0);
+
+    // Map solo seats to coalition candidate ids (for fair comparison)
     const realByCandProv = {};
     for (const p of prov.top5_partidos ?? []) {
       const cid = candId(p.siglas);
-      realByCandProv[cid] = (realByCandProv[cid] ?? 0) + (p.escanos_dhondt ?? 0);
+      realByCandProv[cid] = (realByCandProv[cid] ?? 0) + (soloProv[p.siglas] ?? 0);
     }
 
-    // Simulate this province
+    // Simulate this province with coalitions
     const voteMap = {};
     for (const p of prov.top5_partidos ?? []) {
       const cid = candId(p.siglas);
@@ -484,4 +500,4 @@ display(provinceEl);
 
 ---
 
-> **Nota metodológica.** La simulación usa los votos de los 5 partidos más votados por circunscripción y elección. Partidos fuera de ese top 5 no se modelan explícitamente. Los escaños reales provienen del resultado oficial; los simulados se recalculan mediante D'Hondt con los votos combinados.
+> **Nota metodológica.** La simulación usa los votos de los 5 partidos más votados por circunscripción y elección. Partidos fuera de ese top 5 no se modelan. La columna "Esc. sin coalición" y las diferencias muestran el efecto puro de unir partidos: comparan la simulación con coalición frente a la misma simulación sin ella (ambas con el mismo motor D'Hondt y los mismos datos), eliminando así el sesgo de truncar al top 5. La barra "Real" del gráfico refleja el resultado oficial completo.
