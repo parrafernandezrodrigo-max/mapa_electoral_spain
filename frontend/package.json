@@ -1,0 +1,16 @@
+{
+  "name": "mapa-electoral-spain",
+  "version": "1.0.0",
+  "description": "Mapa electoral interactivo de España — Elecciones Generales 1989-2023",
+  "type": "module",
+  "scripts": {
+    "dev": "observable preview",
+    "build": "observable build",
+    "deploy": "observable deploy"
+  },
+  "dependencies": {
+    "@observablehq/framework": "^1.13.4",
+    "es-atlas": "^0.6.0",
+    "topojson-client": "^3.1.0"
+  }
+}

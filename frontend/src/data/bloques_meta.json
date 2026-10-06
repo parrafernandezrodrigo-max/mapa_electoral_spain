@@ -1,0 +1,22 @@
+{
+  "izq_federal": {
+    "label": "Izquierda federal",
+    "color": "#E63946"
+  },
+  "dcha_federal": {
+    "label": "Derecha federal",
+    "color": "#457B9D"
+  },
+  "nac_izq": {
+    "label": "Nacionalismo izquierda",
+    "color": "#A8DADC"
+  },
+  "nac_centro": {
+    "label": "Nacionalismo centro",
+    "color": "#F4A261"
+  },
+  "regionalismo": {
+    "label": "Regionalismo",
+    "color": "#E9C46A"
+  }
+}

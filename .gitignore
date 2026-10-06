@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Raw ZIPs del Ministerio (descargables con downloader.py)
+data/raw/
+
+# Datos procesados (regenerables con pipeline.py)
+data/processed/
+
+# Observable Framework
+frontend/node_modules/
+frontend/.observablehq/cache/
+frontend/dist/
+
+# OS
+.DS_Store
+Thumbs.db
