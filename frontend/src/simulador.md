@@ -396,7 +396,10 @@ display(chartEl);
 // Coalition + party gain/loss table
 const summaryEl = (() => {
   const { coalSummary, activeCoals } = simResults;
-  if (Object.keys(activeCoals).length === 0) return null;
+  if (Object.keys(activeCoals).length === 0) {
+    const empty = document.createElement("div");
+    return empty;
+  }
 
   const rows = coalSummary.map(entry => ({
     "Grupo":            entry.type === "coal"
@@ -418,7 +421,7 @@ const summaryEl = (() => {
     },
   });
 })();
-if (summaryEl) display(summaryEl);
+display(summaryEl);
 ```
 
 ---
