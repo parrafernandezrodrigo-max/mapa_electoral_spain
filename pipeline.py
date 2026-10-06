@@ -129,16 +129,29 @@ def _build_json(df_results: pd.DataFrame, df_blocks: pd.DataFrame) -> dict:
                 .to_dict("records")
             )
 
-            # Votos perdidos: partidos con 0 escaños, agrupados por bloque
+            # Votos perdidos: partidos con 0 escaños
             prov_all = cr[cr["codigo_provincia"] == cp]
-            wasted = (
-                prov_all[prov_all["escanos_dhondt"] == 0]
-                .groupby("bloque")["votos"].sum()
-                .to_dict()
-            )
+            prov_sin_escano = prov_all[prov_all["escanos_dhondt"] == 0]
+            wasted = prov_sin_escano.groupby("bloque")["votos"].sum().to_dict()
             wasted_total = sum(wasted.values())
             vc = row["votos_candidaturas"]
             pct_wasted = round(wasted_total / vc * 100, 1) if vc > 0 else 0.0
+
+            # Lista de partidos sin escaño, ordenados por votos (para el panel de detalle)
+            partidos_sin_escano = (
+                prov_sin_escano
+                .sort_values("votos", ascending=False)
+                [["siglas", "denominacion", "votos", "bloque"]]
+                .to_dict("records")
+            )
+
+            # Lista de partidos con escaño, ordenados por escaños desc, luego votos desc
+            partidos_con_escano = (
+                prov_all[prov_all["escanos_dhondt"] > 0]
+                .sort_values(["escanos_dhondt", "votos"], ascending=False)
+                [["siglas", "denominacion", "votos", "escanos_dhondt", "bloque"]]
+                .to_dict("records")
+            )
 
             output[conv_id][cp] = {
                 "nombre":               row["nombre_provincia"],
@@ -152,6 +165,8 @@ def _build_json(df_results: pd.DataFrame, df_blocks: pd.DataFrame) -> dict:
                 "top5_partidos":        top5,
                 "votos_perdidos_por_bloque": {k: int(v) for k, v in wasted.items()},
                 "pct_votos_perdidos":   pct_wasted,
+                "partidos_con_escano":  partidos_con_escano,
+                "partidos_sin_escano":  partidos_sin_escano,
             }
 
     return output

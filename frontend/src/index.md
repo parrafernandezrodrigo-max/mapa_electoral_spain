@@ -157,6 +157,80 @@ const mapEl = (() => {
   const wrap = document.createElement("div");
   wrap.style.cssText = "position:relative;max-width:" + W + "px;user-select:none";
 
+  // Detail panel shown when a province is clicked
+  const detailPanel = document.createElement("div");
+  detailPanel.style.cssText = "margin-top:.8rem;display:none";
+  let selectedPath = null;
+
+  function buildDetail(cod) {
+    const p = convData[cod];
+    if (!p) { detailPanel.style.display = "none"; return; }
+
+    const pct = p.pct_votos_perdidos?.toFixed(1) ?? "—";
+    const vc  = p.votos_candidaturas;
+    let html = `<div style="border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;font-size:.84em">`;
+    html += `<div style="background:var(--theme-background-alt,#f5f5f5);padding:8px 14px;font-weight:700;border-bottom:1px solid #e8e8e8">`;
+    html += `${p.nombre} · ${p.label_eleccion} · ${p.seats_total} escaños</div>`;
+
+    // Section 1: parties with seats
+    const conEscano = p.partidos_con_escano ?? [];
+    if (conEscano.length) {
+      html += `<div style="padding:8px 14px;border-bottom:1px solid #f0f0f0">`;
+      html += `<div style="font-weight:600;margin-bottom:4px;opacity:.7">Con representación</div>`;
+      html += `<table style="border-collapse:collapse;width:100%;max-width:520px">`;
+      html += `<tr style="opacity:.5"><td style="padding:1px 6px">Partido</td><td style="text-align:right;padding:1px 6px">Votos</td><td style="text-align:right;padding:1px 6px">%</td><td style="text-align:right;padding:1px 6px">Esc</td></tr>`;
+      for (const q of conEscano) {
+        const pctP = vc > 0 ? (q.votos / vc * 100).toFixed(1) : "—";
+        const col  = bloquesMeta[q.bloque]?.color ?? "#999";
+        html += `<tr>`;
+        html += `<td style="padding:1px 6px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${col};margin-right:4px"></span>${q.siglas}</td>`;
+        html += `<td style="text-align:right;padding:1px 6px">${q.votos.toLocaleString("es-ES")}</td>`;
+        html += `<td style="text-align:right;padding:1px 6px;opacity:.6">${pctP}%</td>`;
+        html += `<td style="text-align:right;padding:1px 6px;font-weight:700">${q.escanos_dhondt}</td>`;
+        html += `</tr>`;
+      }
+      html += `</table></div>`;
+    }
+
+    // Section 2: wasted votes grouped by block
+    const sinEscano = p.partidos_sin_escano ?? [];
+    if (sinEscano.length) {
+      const byBlock = new Map();
+      for (const q of sinEscano) {
+        if (!byBlock.has(q.bloque)) byBlock.set(q.bloque, []);
+        byBlock.get(q.bloque).push(q);
+      }
+      const blocksSorted = [...byBlock.entries()]
+        .map(([b, ps]) => [b, ps, ps.reduce((s, q) => s + q.votos, 0)])
+        .sort((a, b) => b[2] - a[2]);
+      const totalLost = blocksSorted.reduce((s, [,, t]) => s + t, 0);
+
+      html += `<div style="padding:8px 14px">`;
+      html += `<div style="font-weight:600;margin-bottom:4px;opacity:.7">Sin representación · ${pct}% del voto (${totalLost.toLocaleString("es-ES")} votos)</div>`;
+      for (const [blq, partidos, total] of blocksSorted) {
+        const bMeta = bloquesMeta[blq] ?? { label: blq, color: "#999" };
+        const pctB  = vc > 0 ? (total / vc * 100).toFixed(1) : "—";
+        html += `<div style="margin:5px 0 2px;font-weight:600;color:${bMeta.color}">● ${bMeta.label} — ${total.toLocaleString("es-ES")} votos (${pctB}%)</div>`;
+        html += `<table style="border-collapse:collapse;width:100%;max-width:520px">`;
+        for (const q of partidos) {
+          const pctP = vc > 0 ? (q.votos / vc * 100).toFixed(1) : "—";
+          html += `<tr>`;
+          html += `<td style="padding:0 6px 0 16px;opacity:.7">${q.siglas}</td>`;
+          html += `<td style="padding:0 6px;opacity:.5;font-size:.95em">${q.denominacion}</td>`;
+          html += `<td style="text-align:right;padding:0 6px">${q.votos.toLocaleString("es-ES")}</td>`;
+          html += `<td style="text-align:right;padding:0 6px;opacity:.6">${pctP}%</td>`;
+          html += `</tr>`;
+        }
+        html += `</table>`;
+      }
+      html += `</div>`;
+    }
+
+    html += `</div>`;
+    detailPanel.innerHTML = html;
+    detailPanel.style.display = "block";
+  }
+
   const svgEl = d3.create("svg")
     .attr("viewBox", "0 0 " + W + " " + H)
     .style("width", "100%")
@@ -248,13 +322,27 @@ const mapEl = (() => {
       .attr("pointer-events", "all")  // captura eventos aunque fill sea pattern/none
       .style("cursor", "pointer")
       .on("mouseover", function(evt, f) {
-        d3.select(this).attr("stroke", "#333").attr("stroke-width", 1.5);
+        if (this !== selectedPath) d3.select(this).attr("stroke", "#333").attr("stroke-width", 1.5);
         showTip(evt, f.properties.cod_ine);
       })
       .on("mousemove", (evt, f) => showTip(evt, f.properties.cod_ine))
       .on("mouseout", function() {
-        d3.select(this).attr("stroke", "#fff").attr("stroke-width", 0.6);
+        if (this !== selectedPath) d3.select(this).attr("stroke", "#fff").attr("stroke-width", 0.6);
         tip.style("display", "none");
+      })
+      .on("click", function(evt, f) {
+        const cod = f.properties.cod_ine;
+        if (selectedPath === this) {
+          // Deselect
+          d3.select(this).attr("stroke", "#fff").attr("stroke-width", 0.6);
+          selectedPath = null;
+          detailPanel.style.display = "none";
+        } else {
+          if (selectedPath) d3.select(selectedPath).attr("stroke", "#fff").attr("stroke-width", 0.6);
+          d3.select(this).attr("stroke", "#333").attr("stroke-width", 2.5);
+          selectedPath = this;
+          buildDetail(cod);
+        }
       });
   }
 
@@ -276,6 +364,7 @@ const mapEl = (() => {
   drawProvinces(geoCan, pathCan);
   drawProvinces(geoCeuta, pathCeuta);
   drawProvinces(geMelilla, pathMelilla);
+  wrap.appendChild(detailPanel);
 
   // Recuadro inset (más pequeño)
   const iY = H - 150, iW = 275, iH = 145;
