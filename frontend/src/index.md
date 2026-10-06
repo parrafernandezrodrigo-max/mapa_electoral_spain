@@ -40,6 +40,11 @@ const barrierColor = d3.scaleSequential()
   .interpolator(t => d3.interpolateRdYlGn(1 - t))
   .clamp(true);
 
+const wastedColor = d3.scaleSequential()
+  .domain([0, 40])
+  .interpolator(t => d3.interpolateOranges(t * 0.9 + 0.05))
+  .clamp(true);
+
 const CONV_LABELS = {
   "197706": "Jun 1977", "197903": "Mar 1979", "198210": "Oct 1982", "198606": "Jun 1986",
   "198910": "Oct 1989", "199306": "Jun 1993", "199603": "Mar 1996",
@@ -56,9 +61,9 @@ const convInput = Inputs.select(Object.keys(CONV_LABELS), {
   value: "202307",
 
 });
-const vistaInput = Inputs.radio(["bloque_ganador", "barrera_real"], {
+const vistaInput = Inputs.radio(["bloque_ganador", "barrera_real", "votos_perdidos"], {
   label: "Vista",
-  format: d => d === "bloque_ganador" ? "Bloque ganador" : "Barrera real",
+  format: d => ({ bloque_ganador: "Bloque ganador", barrera_real: "Barrera real", votos_perdidos: "Votos perdidos" })[d],
   value: "bloque_ganador",
 });
 const convId = Generators.input(convInput);
@@ -93,6 +98,23 @@ const legendEl = (() => {
     note.style.cssText = "opacity:.5;font-size:.82em";
     note.textContent = "(verde=baja · rojo=alta)";
     div.appendChild(note);
+  } else if (vista === "votos_perdidos") {
+    div.style.alignItems = "center";
+    div.style.gap = "8px";
+    const label = document.createElement("span");
+    label.style.cssText = "opacity:.7;font-size:.82em";
+    label.textContent = "% votos sin escaño →";
+    div.appendChild(label);
+    for (const v of [0, 5, 10, 15, 20, 30, 40]) {
+      const s = document.createElement("span");
+      s.style.cssText = "display:inline-flex;align-items:center;gap:3px;font-size:.82em";
+      s.innerHTML = `<span style="display:inline-block;width:24px;height:12px;background:${wastedColor(v)};border-radius:2px"></span><span>${v}%</span>`;
+      div.appendChild(s);
+    }
+    const note = document.createElement("span");
+    note.style.cssText = "opacity:.5;font-size:.82em";
+    note.textContent = "(claro=poco · naranja=mucho)";
+    div.appendChild(note);
   } else {
     const entries = [...Object.entries(bloquesMeta), ["otros", { label: "Otros", color: "#999" }]];
     for (const [, b] of entries) {
@@ -117,6 +139,7 @@ const mapEl = (() => {
     const p = convData[cod];
     if (!p) return "#e0e0e0";
     if (vista === "barrera_real") return p.barrera_real_pct != null ? barrierColor(p.barrera_real_pct) : "#e0e0e0";
+    if (vista === "votos_perdidos") return p.pct_votos_perdidos != null ? wastedColor(p.pct_votos_perdidos) : "#e0e0e0";
 
     // Detectar empate entre bloques
     const esc = p.escanos_por_bloque ?? {};
@@ -186,6 +209,19 @@ const mapEl = (() => {
     const top5 = (p.top5_partidos ?? []).slice(0, 5)
       .map(q => `<tr><td>${q.siglas}</td><td style="text-align:right;padding-left:8px">${q.votos.toLocaleString("es-ES")}</td><td style="text-align:right;padding-left:6px">${q.escanos_dhondt}</td></tr>`)
       .join("");
+
+    const wastedRows = Object.entries(p.votos_perdidos_por_bloque ?? {})
+      .sort((a, b) => b[1] - a[1])
+      .map(([b, v]) => `<tr><td style="color:${COLORS[b] ?? "#999"};font-weight:600">${bloquesMeta[b]?.label ?? b}</td><td style="text-align:right;padding-left:8px">${v.toLocaleString("es-ES")}</td></tr>`)
+      .join("");
+
+    const wastedSection = vista === "votos_perdidos" && wastedRows ? `
+      <div style="margin-top:6px;font-size:.9em;font-weight:600">Votos sin escaño: ${p.pct_votos_perdidos?.toFixed(1) ?? "—"}%</div>
+      <table style="width:100%;border-collapse:collapse;margin-top:2px">
+        <tr style="opacity:.5;font-size:.9em"><td>Bloque</td><td style="text-align:right">Votos</td></tr>
+        ${wastedRows}
+      </table>` : "";
+
     tip.html(`
       <strong style="font-size:1.05em">${p.nombre}</strong><br>
       <span style="opacity:.6">${p.label_eleccion} · ${p.seats_total} escaños</span><br><br>
@@ -195,7 +231,8 @@ const mapEl = (() => {
       <table style="width:100%;border-collapse:collapse;margin-top:4px">
         <tr style="opacity:.5;font-size:.9em"><td>Partido</td><td style="text-align:right">Votos</td><td style="text-align:right">Esc</td></tr>
         ${top5}
-      </table>`);
+      </table>
+      ${wastedSection}`);
     const rect = wrap.getBoundingClientRect();
     tip.style("left", (event.clientX - rect.left + 14) + "px")
        .style("top",  (event.clientY - rect.top  - 10) + "px")
@@ -280,17 +317,18 @@ const tableEl = (() => {
   const convData = results[convId] ?? {};
   const rows = Object.entries(convData)
     .map(([, p]) => ({
-      "Provincia":      p.nombre,
-      "Escaños":        p.seats_total,
-      "Barrera real %": p.barrera_real_pct != null ? +p.barrera_real_pct.toFixed(2) : null,
-      "Último escaño":  p.partido_ultimo_escano,
-      "Bloque ganador": bloquesMeta[p.bloque_ganador]?.label ?? "—",
+      "Provincia":        p.nombre,
+      "Escaños":          p.seats_total,
+      "Barrera real %":   p.barrera_real_pct != null ? +p.barrera_real_pct.toFixed(2) : null,
+      "Votos perdidos %": p.pct_votos_perdidos != null ? +p.pct_votos_perdidos.toFixed(1) : null,
+      "Último escaño":    p.partido_ultimo_escano,
+      "Bloque ganador":   bloquesMeta[p.bloque_ganador]?.label ?? "—",
     }));
 
   return Inputs.table(rows, {
-    columns: ["Provincia", "Escaños", "Barrera real %", "Último escaño", "Bloque ganador"],
+    columns: ["Provincia", "Escaños", "Barrera real %", "Votos perdidos %", "Último escaño", "Bloque ganador"],
     rows: 52,
-    sort: "Barrera real %",
+    sort: "Votos perdidos %",
     reverse: true,
   });
 })();

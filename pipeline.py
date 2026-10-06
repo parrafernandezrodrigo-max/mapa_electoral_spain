@@ -129,6 +129,17 @@ def _build_json(df_results: pd.DataFrame, df_blocks: pd.DataFrame) -> dict:
                 .to_dict("records")
             )
 
+            # Votos perdidos: partidos con 0 escaños, agrupados por bloque
+            prov_all = cr[cr["codigo_provincia"] == cp]
+            wasted = (
+                prov_all[prov_all["escanos_dhondt"] == 0]
+                .groupby("bloque")["votos"].sum()
+                .to_dict()
+            )
+            wasted_total = sum(wasted.values())
+            vc = row["votos_candidaturas"]
+            pct_wasted = round(wasted_total / vc * 100, 1) if vc > 0 else 0.0
+
             output[conv_id][cp] = {
                 "nombre":               row["nombre_provincia"],
                 "label_eleccion":       label,
@@ -139,6 +150,8 @@ def _build_json(df_results: pd.DataFrame, df_blocks: pd.DataFrame) -> dict:
                 "bloque_ganador":       bloque_ganador,
                 "escanos_por_bloque":   {k: int(v) for k, v in blocks_pivot.get(cp, {}).items()},
                 "top5_partidos":        top5,
+                "votos_perdidos_por_bloque": {k: int(v) for k, v in wasted.items()},
+                "pct_votos_perdidos":   pct_wasted,
             }
 
     return output
