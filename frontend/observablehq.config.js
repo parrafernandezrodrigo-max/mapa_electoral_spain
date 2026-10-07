@@ -1,5 +1,6 @@
 export default {
   title: "Mapa Electoral España",
+  favicon: "🗳️",
   root: "src",
   output: "dist",
   theme: ["air", "near-midnight"],
