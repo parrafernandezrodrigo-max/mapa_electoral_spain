@@ -39,9 +39,48 @@ const provOptions = Object.entries(convData)
 const provInput = Inputs.select(provOptions, {
   label: "Provincia",
   format: d => d.nombre,
-  value: provOptions.find(d => d.cp === "42") ?? provOptions[0],
+  value: provOptions.find(d => d.cp === "15") ?? provOptions[0],
 });
 const selectedProv = Generators.input(provInput);
+```
+
+```js
+const encuestaRefEl = (() => {
+  const DATOS = [
+    { s: "PP",        pct: 33.6, bloque: "dcha_federal" },
+    { s: "PSOE",      pct: 25.7, bloque: "izq_federal"  },
+    { s: "Vox",       pct: 18.0, bloque: "dcha_federal" },
+    { s: "Sumar",     pct:  5.3, bloque: "izq_federal"  },
+    { s: "Podemos",   pct:  3.6, bloque: "izq_federal"  },
+    { s: "ERC",       pct:  2.0, bloque: "nac_izq"      },
+    { s: "SALF",      pct:  1.7, bloque: null            },
+    { s: "EH Bildu",  pct:  1.4, bloque: "nac_izq"      },
+    { s: "Junts",     pct:  1.2, bloque: "nac_centro"   },
+    { s: "PNV",       pct:  1.1, bloque: "nac_centro"   },
+    { s: "BNG",       pct:  0.9, bloque: "nac_izq"      },
+    { s: "Adel.And.", pct:  0.9, bloque: "nac_izq"      },
+    { s: "CC",        pct:  0.4, bloque: "regionalismo" },
+    { s: "UPN",       pct:  0.2, bloque: "regionalismo" },
+  ];
+  const div = document.createElement("div");
+  div.style.cssText = "max-width:760px;margin:.8rem 0 1rem;padding:.55rem .9rem;background:rgba(0,0,0,.025);border-radius:6px;border:1px solid rgba(0,0,0,.07)";
+  const hdr = document.createElement("div");
+  hdr.style.cssText = "font-size:.73em;opacity:.5;margin-bottom:.5rem";
+  hdr.innerHTML = "<b>Media de encuestas</b> · Ponderado PollCheck · sept. 2026 · <a href=\"https://electomania.es\" target=\"_blank\" style=\"color:inherit;text-decoration:underline\">electomania.es</a>";
+  div.appendChild(hdr);
+  const chips = document.createElement("div");
+  chips.style.cssText = "display:flex;flex-wrap:wrap;gap:5px";
+  for (const d of DATOS) {
+    const col = d.bloque ? (COLORS[d.bloque] ?? "#999") : "#999";
+    const chip = document.createElement("span");
+    chip.style.cssText = `font-size:.78em;font-weight:700;padding:2px 9px;border-radius:20px;background:${col}22;border:1px solid ${col}66;white-space:nowrap`;
+    chip.textContent = `${d.s} ${d.pct.toFixed(1).replace(".", ",")}%`;
+    chips.appendChild(chip);
+  }
+  div.appendChild(chips);
+  return div;
+})();
+display(encuestaRefEl);
 ```
 
 ${provInput}
