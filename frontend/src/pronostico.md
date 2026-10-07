@@ -47,19 +47,19 @@ const selectedProv = Generators.input(provInput);
 ```js
 const encuestaRefEl = (() => {
   const DATOS = [
-    { s: "PP",        pct: 33.6, bloque: "dcha_federal" },
-    { s: "PSOE",      pct: 25.7, bloque: "izq_federal"  },
-    { s: "Vox",       pct: 18.0, bloque: "dcha_federal" },
-    { s: "Sumar",     pct:  5.3, bloque: "izq_federal"  },
-    { s: "Podemos",   pct:  3.6, bloque: "izq_federal"  },
+    { s: "PP",        pct: 31.8, bloque: "dcha_federal" },
+    { s: "PSOE",      pct: 26.7, bloque: "izq_federal"  },
+    { s: "Vox",       pct: 18.7, bloque: "dcha_federal" },
+    { s: "Sumar",     pct:  5.7, bloque: "izq_federal"  },
+    { s: "Podemos",   pct:  3.1, bloque: "izq_federal"  },
     { s: "ERC",       pct:  2.0, bloque: "nac_izq"      },
-    { s: "SALF",      pct:  1.7, bloque: null            },
+    { s: "SALF",      pct:  1.9, bloque: null            },
     { s: "EH Bildu",  pct:  1.4, bloque: "nac_izq"      },
-    { s: "Junts",     pct:  1.2, bloque: "nac_centro"   },
+    { s: "Junts",     pct:  1.1, bloque: "nac_centro"   },
     { s: "PNV",       pct:  1.1, bloque: "nac_centro"   },
-    { s: "BNG",       pct:  0.9, bloque: "nac_izq"      },
-    { s: "Adel.And.", pct:  0.9, bloque: "nac_izq"      },
-    { s: "CC",        pct:  0.4, bloque: "regionalismo" },
+    { s: "AA",        pct:  1.1, bloque: "nac_izq"      },
+    { s: "BNG",       pct:  1.0, bloque: "nac_izq"      },
+    { s: "CC",        pct:  0.3, bloque: "regionalismo" },
     { s: "UPN",       pct:  0.2, bloque: "regionalismo" },
   ];
   const div = document.createElement("div");
