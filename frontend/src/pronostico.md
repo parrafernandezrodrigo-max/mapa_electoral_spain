@@ -117,12 +117,15 @@ const simEl = (() => {
     updateAll();
   }
 
-  // D'Hondt: runs on proportions (invariant to scaling, so sum≠100% is fine)
+  // D'Hondt con barrera del 3% (LOREG art. 163)
+  // El umbral se calcula sobre votos válidos = sum(todos los sliders) ≈ 100%
   function runDhondt() {
+    const totalValid = pcts.reduce((s, v) => s + v, 0);
+    const threshold  = totalValid * 0.03;
     const cands = entries
       .map((e, i) => ({ e, i }))
       .filter(({ e }) => !e.isBlancos)
-      .filter(({ i }) => pcts[i] > 0)
+      .filter(({ i }) => pcts[i] >= threshold)
       .map(({ e, i }) => ({ id: e.id, votes: pcts[i] }));
     return dhondt(cands, seats2026);
   }
@@ -389,4 +392,4 @@ display(simEl);
 
 ---
 
-> **Nota metodológica.** Base de partida: resultado oficial de Jul 2023 por circunscripción. "Otros" agrupa los partidos con menos del 1% de votos a candidaturas. Los votos en blanco se excluyen del cálculo D'Hondt. Los escaños de Cádiz y Madrid están actualizados al ajuste poblacional de 2026 (Cádiz −1, Madrid +1). La barrera legal del 3% no está modelada.
+> **Nota metodológica.** Base de partida: resultado oficial de Jul 2023 por circunscripción. "Otros" agrupa los partidos con menos del 1% de votos a candidaturas. Los votos en blanco se excluyen del reparto D'Hondt (votos válidos = candidaturas + blancos). Se aplica la barrera legal del 3% provincial (LOREG art. 163): candidaturas que no alcanzan el 3% de los votos válidos quedan excluidas del reparto, lo que solo cambia el resultado en circunscripciones grandes donde la barrera real baja del 3%. Los escaños de Cádiz y Madrid están actualizados al ajuste poblacional de 2026 (Cádiz −1, Madrid +1).

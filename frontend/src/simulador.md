@@ -43,6 +43,12 @@ function dhondt(candidates, seats) {
   for (const { id } of q.slice(0, seats)) out[id] = (out[id] ?? 0) + 1;
   return out;
 }
+
+// LOREG art. 163: candidatures with < 3% of valid votes in the constituency are excluded
+function applyThreshold(voteMap, votos_candidaturas) {
+  const thr = (votos_candidaturas ?? 0) * 0.03;
+  return Object.fromEntries(Object.entries(voteMap).filter(([, v]) => v >= thr));
+}
 ```
 
 ```js
@@ -211,8 +217,9 @@ const simResults = (() => {
   // Used as reference so the top5-truncation bias cancels out in deltas
   const simByCandSolo = {};
   for (const prov of Object.values(results[elecId] ?? {})) {
-    const voteMap = {};
+    let voteMap = {};
     for (const p of prov.top5_partidos ?? []) voteMap[p.siglas] = (p.votos ?? 0);
+    voteMap = applyThreshold(voteMap, prov.votos_candidaturas);
     const won = dhondt(Object.entries(voteMap).map(([id, votes]) => ({ id, votes })), prov.seats_total ?? 0);
     for (const [id, n] of Object.entries(won)) simByCandSolo[id] = (simByCandSolo[id] ?? 0) + n;
   }
@@ -220,11 +227,12 @@ const simResults = (() => {
   // Simulate per province with coalition merges
   const simByCand = {}; // candId -> seats nationally
   for (const prov of Object.values(results[elecId] ?? {})) {
-    const voteMap = {};
+    let voteMap = {};
     for (const p of prov.top5_partidos ?? []) {
       const cid = candId(p.siglas);
       voteMap[cid] = (voteMap[cid] ?? 0) + (p.votos ?? 0);
     }
+    voteMap = applyThreshold(voteMap, prov.votos_candidaturas);
     const won = dhondt(Object.entries(voteMap).map(([id, votes]) => ({ id, votes })), prov.seats_total ?? 0);
     for (const [id, n] of Object.entries(won)) simByCand[id] = (simByCand[id] ?? 0) + n;
   }
@@ -447,8 +455,9 @@ const provinceEl = (() => {
 
   const rows = Object.entries(results[elecId] ?? {}).map(([cp, prov]) => {
     // Baseline simulation (all solo, top5 only) — reference to cancel top5-truncation bias
-    const soloVoteMap = {};
+    let soloVoteMap = {};
     for (const p of prov.top5_partidos ?? []) soloVoteMap[p.siglas] = (p.votos ?? 0);
+    soloVoteMap = applyThreshold(soloVoteMap, prov.votos_candidaturas);
     const soloProv = dhondt(Object.entries(soloVoteMap).map(([id, v]) => ({id, votes: v})), prov.seats_total ?? 0);
 
     // Map solo seats to coalition candidate ids (for fair comparison)
@@ -459,11 +468,12 @@ const provinceEl = (() => {
     }
 
     // Simulate this province with coalitions
-    const voteMap = {};
+    let voteMap = {};
     for (const p of prov.top5_partidos ?? []) {
       const cid = candId(p.siglas);
       voteMap[cid] = (voteMap[cid] ?? 0) + (p.votos ?? 0);
     }
+    voteMap = applyThreshold(voteMap, prov.votos_candidaturas);
     const simProv = dhondt(Object.entries(voteMap).map(([id, v]) => ({id, votes: v})), prov.seats_total ?? 0);
 
     // Seats change (sum of abs deltas)
@@ -503,4 +513,4 @@ display(provinceEl);
 
 ---
 
-> **Nota metodológica.** La simulación usa los votos de los 5 partidos más votados por circunscripción y elección. Partidos fuera de ese top 5 no se modelan. La columna "Esc. sin coalición" y las diferencias muestran el efecto puro de unir partidos: comparan la simulación con coalición frente a la misma simulación sin ella (ambas con el mismo motor D'Hondt y los mismos datos), eliminando así el sesgo de truncar al top 5. La barra "Real" del gráfico refleja el resultado oficial completo.
+> **Nota metodológica.** La simulación usa los votos de los 5 partidos más votados por circunscripción y elección. Partidos fuera de ese top 5 no se modelan. Se aplica la barrera legal del 3% provincial (LOREG art. 163): candidaturas por debajo de ese umbral quedan excluidas del reparto D'Hondt, tal como ocurre en las elecciones reales. La columna "Esc. sin coalición" compara la simulación con coalición frente a la misma simulación sin ella (mismo motor, mismos datos), eliminando así el sesgo del top 5. La barra "Real" refleja el resultado oficial completo.
