@@ -8,6 +8,7 @@ title: Bloques ideológicos
 </div>
 
 ```js
+import * as d3 from "npm:d3";
 const results     = await FileAttachment("data/summary_province.json").json();
 const bloquesMeta = await FileAttachment("data/bloques_meta.json").json();
 ```
@@ -54,6 +55,145 @@ const bloquesList = bloqueOrder.map(id => {
 const totalVotos = bloquesList.reduce(
   (acc, b) => acc + b.partidos.reduce((s, p) => s + p.votos, 0), 0
 );
+```
+
+```js
+const CONV_LABELS = {
+  "197706": "1977", "197903": "1979", "198210": "1982", "198606": "1986",
+  "198910": "1989", "199306": "1993", "199603": "1996",
+  "200003": "2000", "200403": "2004", "200803": "2008",
+  "201111": "2011", "201512": "2015", "201606": "2016",
+  "201904": "2019a","201911": "2019b","202307": "2023",
+};
+const convIds     = Object.keys(CONV_LABELS);
+const bloqueOrder = [...Object.keys(bloquesMeta), "otros"];
+const COLORS      = { ...Object.fromEntries(Object.entries(bloquesMeta).map(([k,v]) => [k, v.color])), otros: "#999" };
+
+// Escaños por bloque por elección
+const seatsByElec = convIds.map(cid => {
+  const row = { convId: cid, label: CONV_LABELS[cid] };
+  for (const blq of bloqueOrder) row[blq] = 0;
+  for (const [, provData] of Object.entries(results[cid] ?? {})) {
+    for (const [blq, n] of Object.entries(provData.escanos_por_bloque ?? {})) {
+      if (blq in row) row[blq] += n;
+    }
+  }
+  row._total = bloqueOrder.reduce((s, b) => s + (row[b] ?? 0), 0);
+  return row;
+});
+```
+
+```js
+const evolucionBloquesEl = (() => {
+  const W = 860, H = 300;
+  const margin = { top: 16, right: 140, bottom: 36, left: 44 };
+  const iW = W - margin.left - margin.right;
+  const iH = H - margin.top - margin.bottom;
+
+  const bloquesActivos = bloqueOrder.filter(b => seatsByElec.some(r => r[b] > 0));
+
+  const stack  = d3.stack().keys(bloquesActivos).order(d3.stackOrderNone).offset(d3.stackOffsetNone);
+  const stacked = stack(seatsByElec);
+
+  const xScale = d3.scaleBand().domain(seatsByElec.map(d => d.label)).range([0, iW]).padding(0.18);
+  const yMax   = d3.max(seatsByElec, d => d._total) ?? 350;
+  const yScale = d3.scaleLinear().domain([0, yMax]).range([iH, 0]).nice();
+
+  const svg = d3.create("svg")
+    .attr("viewBox", "0 0 " + W + " " + H)
+    .style("width", "100%").style("display", "block");
+
+  const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+  // Grid
+  g.append("g")
+    .call(d3.axisLeft(yScale).tickSize(-iW).tickFormat(""))
+    .call(g => g.select(".domain").remove())
+    .call(g => g.selectAll("line").attr("stroke", "#ebebeb").attr("stroke-dasharray", "2,2"));
+
+  // Mayoría absoluta
+  const maj = Math.round(yMax / 2);
+  if (maj > 0) {
+    g.append("line")
+      .attr("x1", 0).attr("y1", yScale(maj)).attr("x2", iW).attr("y2", yScale(maj))
+      .attr("stroke", "#555").attr("stroke-width", 1.2).attr("stroke-dasharray", "5,3");
+    g.append("text")
+      .attr("x", iW + 4).attr("y", yScale(maj) + 4)
+      .attr("font-size", "9px").attr("fill", "#555").attr("font-weight", "600")
+      .text("m.a.");
+  }
+
+  // Barras apiladas
+  const tooltip = d3.select(document.body).append("div")
+    .style("position", "fixed").style("display", "none")
+    .style("background", "var(--theme-background-alt,#fff)")
+    .style("border", "1px solid #ddd").style("border-radius", "6px")
+    .style("padding", "9px 13px").style("font-size", ".8em")
+    .style("pointer-events", "none").style("box-shadow", "0 4px 14px rgba(0,0,0,.13)")
+    .style("z-index", "9999").style("min-width", "170px");
+
+  g.selectAll("g.layer")
+    .data(stacked)
+    .join("g")
+      .attr("class", "layer")
+      .attr("fill", d => COLORS[d.key] ?? "#999")
+    .selectAll("rect")
+    .data(d => d.map(pt => ({ ...pt, key: d.key })))
+    .join("rect")
+      .attr("x", d => xScale(d.data.label))
+      .attr("y", d => yScale(d[1]))
+      .attr("height", d => Math.max(0, yScale(d[0]) - yScale(d[1])))
+      .attr("width", xScale.bandwidth())
+      .attr("opacity", 0.88)
+    .on("mousemove", (event, d) => {
+      const r   = d.data;
+      const lbl = bloquesMeta[d.key]?.label ?? d.key;
+      const n   = r[d.key] ?? 0;
+      let html = `<b>${r.label}</b> · ${lbl}<br><br>`;
+      html += `<b>${n} escaños</b><br>`;
+      html += `<span style="opacity:.6">${r._total} total · mayoría abs. ${Math.ceil(r._total / 2) + 1}</span><hr style="margin:6px 0;border:none;border-top:1px solid #eee">`;
+      for (const b of bloquesActivos) {
+        if (!r[b]) continue;
+        html += `<div style="display:flex;justify-content:space-between;gap:20px">
+          <span style="display:flex;align-items:center;gap:4px">
+            <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${COLORS[b]}"></span>
+            ${bloquesMeta[b]?.label ?? b}
+          </span>
+          <b>${r[b]}</b>
+        </div>`;
+      }
+      tooltip.html(html).style("display", "block")
+        .style("left", (event.clientX + 14) + "px")
+        .style("top",  (event.clientY - 10) + "px");
+    })
+    .on("mouseleave", () => tooltip.style("display", "none"));
+
+  // Eje X
+  g.append("g").attr("transform", `translate(0,${iH})`)
+    .call(d3.axisBottom(xScale).tickSize(3))
+    .call(g => g.select(".domain").attr("stroke", "#ccc"))
+    .call(g => g.selectAll("text").attr("font-size", "10px").attr("fill", "#666"));
+
+  // Eje Y
+  g.append("g")
+    .call(d3.axisLeft(yScale).ticks(6))
+    .call(g => g.select(".domain").remove())
+    .call(g => g.selectAll("text").attr("font-size", "10px").attr("fill", "#666"));
+
+  // Leyenda
+  const legend = svg.append("g").attr("transform", `translate(${margin.left + iW + 10},${margin.top})`);
+  bloquesActivos.forEach((b, i) => {
+    const row = legend.append("g").attr("transform", `translate(0,${i * 18})`);
+    row.append("rect").attr("width", 10).attr("height", 10).attr("y", 1).attr("rx", 2).attr("fill", COLORS[b] ?? "#999").attr("opacity", 0.88);
+    row.append("text").attr("x", 14).attr("y", 10).attr("font-size", "10px").attr("fill", "#555").text(bloquesMeta[b]?.label ?? b);
+  });
+
+  const wrap = document.createElement("div");
+  wrap.style.cssText = "margin-bottom:1.5rem";
+  wrap.appendChild(svg.node());
+  return wrap;
+})();
+display(evolucionBloquesEl);
 ```
 
 ```js

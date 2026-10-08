@@ -245,21 +245,34 @@ display(chartEl);
 
 ```js
 const tablaEl = (() => {
-  // Construir filas: una por provincia, columnas = elecciones
+  const LAST4 = ["201606", "201904", "201911", "202307"];
+
+  // Construir filas: una por provincia, columnas = elecciones + medias
   const rows = series.map(s => {
     const row = { Provincia: s.nombre };
     for (const cid of convIds) {
       const pt = s.pts.find(p => p.convId === cid);
       row[CONV_LABELS[cid]] = pt ? +pt.y.toFixed(1) : null;
     }
+    const last4pts = s.pts.filter(p => LAST4.includes(p.convId));
+    row["Media últ. 4"] = last4pts.length
+      ? +(last4pts.reduce((sum, p) => sum + p.y, 0) / last4pts.length).toFixed(1)
+      : null;
+    row["Media total"] = s.pts.length
+      ? +(s.pts.reduce((sum, p) => sum + p.y, 0) / s.pts.length).toFixed(1)
+      : null;
     return row;
   });
   return Inputs.table(rows, {
-    columns: ["Provincia", ...convIds.map(c => CONV_LABELS[c])],
+    columns: ["Provincia", ...convIds.map(c => CONV_LABELS[c]), "Media últ. 4", "Media total"],
     rows: 52,
-    format: Object.fromEntries(
-      convIds.map(c => [CONV_LABELS[c], d => d != null ? d.toFixed(1) + "%" : "—"])
-    ),
+    format: {
+      ...Object.fromEntries(
+        convIds.map(c => [CONV_LABELS[c], d => d != null ? d.toFixed(1) + "%" : "—"])
+      ),
+      "Media últ. 4": d => d != null ? d.toFixed(1) + "%" : "—",
+      "Media total":  d => d != null ? d.toFixed(1) + "%" : "—",
+    },
   });
 })();
 display(tablaEl);
