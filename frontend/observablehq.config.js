@@ -15,5 +15,6 @@ export default {
     { name: "Bloques ideológicos", path: "/bloques" },
     { name: "¿Y si hubieran ido juntos?", path: "/simulador" },
     { name: "Simulador electoral 2026",   path: "/pronostico" },
+    { name: "Estimador provincial 2026",  path: "/estimador" },
   ],
 };
