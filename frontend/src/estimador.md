@@ -59,14 +59,60 @@ for (const { cp } of provList) {
 ```
 
 ```js
+// ── Media de encuestas ────────────────────────────────────────────────
+const encuestaRefEl = (() => {
+  const DATOS = [
+    { s: "PP",        pct: 31.8, bloque: "dcha_federal" },
+    { s: "PSOE",      pct: 26.7, bloque: "izq_federal"  },
+    { s: "Vox",       pct: 18.7, bloque: "dcha_federal" },
+    { s: "Sumar",     pct:  5.7, bloque: "izq_federal"  },
+    { s: "Podemos",   pct:  3.1, bloque: "izq_federal"  },
+    { s: "ERC",       pct:  2.0, bloque: "nac_izq"      },
+    { s: "SALF",      pct:  1.9, bloque: null            },
+    { s: "EH Bildu",  pct:  1.4, bloque: "nac_izq"      },
+    { s: "Junts",     pct:  1.1, bloque: "nac_centro"   },
+    { s: "PNV",       pct:  1.1, bloque: "nac_centro"   },
+    { s: "AA",        pct:  1.1, bloque: "nac_izq"      },
+    { s: "BNG",       pct:  1.0, bloque: "nac_izq"      },
+    { s: "CC",        pct:  0.3, bloque: "regionalismo" },
+    { s: "UPN",       pct:  0.2, bloque: "regionalismo" },
+  ];
+  const div = document.createElement("div");
+  div.style.cssText = "max-width:760px;margin:.8rem 0 1.2rem;padding:.55rem .9rem;background:rgba(0,0,0,.025);border-radius:6px;border:1px solid rgba(0,0,0,.07)";
+  const hdr = document.createElement("div");
+  hdr.style.cssText = "font-size:.73em;opacity:.5;margin-bottom:.5rem";
+  hdr.innerHTML = "<b>Media de encuestas</b> · Ponderado PollCheck · sept. 2026 · <a href=\"https://electomania.es\" target=\"_blank\" style=\"color:inherit;text-decoration:underline\">electomania.es</a>";
+  div.appendChild(hdr);
+  const chips = document.createElement("div");
+  chips.style.cssText = "display:flex;flex-wrap:wrap;gap:5px";
+  for (const d of DATOS) {
+    const col  = d.bloque ? (COLORS[d.bloque] ?? "#999") : "#999";
+    const chip = document.createElement("span");
+    chip.style.cssText = `font-size:.78em;font-weight:700;padding:2px 9px;border-radius:20px;background:${col}22;border:1px solid ${col}66;white-space:nowrap`;
+    chip.textContent = `${d.s} ${d.pct.toFixed(1).replace(".", ",")}%`;
+    chips.appendChild(chip);
+  }
+  div.appendChild(chips);
+  return div;
+})();
+display(encuestaRefEl);
+```
+
+```js
 const mainEl = (() => {
   const THRESHOLD = 0.01;
   const OTROS_ID  = "__otros__";
   const BLANCO_ID = "__blancos__";
-  const provState = {};   // cp -> pcts[]
+
+  // Global extra parties (shared across all provinces)
+  const extraParties = [];
+  let nuevoCount = 0;
+
+  const provState = {};   // cp -> pcts[] (parallel to getEntries(cp))
   let currentIdx  = 0;
   let showSummary = false;
 
+  // ── D'Hondt ────────────────────────────────────────────────────────
   function dhondt(candidates, seats) {
     if (!seats || !candidates.length) return {};
     const q = [];
@@ -78,6 +124,7 @@ const mainEl = (() => {
     return out;
   }
 
+  // ── Entries (base parties + extra) ────────────────────────────────
   function getEntries(cp) {
     const p  = convData[cp];
     const vc = p.votos_candidaturas;
@@ -88,28 +135,44 @@ const mainEl = (() => {
       ...shown.map(q => ({
         id: q.siglas, label: q.siglas, denominacion: q.denominacion,
         bloque: q.bloque, escanos2023: q.escanos_dhondt ?? 0,
-        isBlancos: false, isOtros: false, initPct: q.votos / vc * 100,
+        isBlancos: false, isOtros: false, isNuevo: false, initPct: q.votos / vc * 100,
       })),
       ...(otrosVotos > 0 ? [{
         id: OTROS_ID, label: "Otros",
         denominacion: `Partidos con <1% (${allParties.filter(q => q.votos / vc < THRESHOLD).length} partidos)`,
         bloque: "otros", escanos2023: 0,
-        isBlancos: false, isOtros: true, initPct: otrosVotos / vc * 100,
+        isBlancos: false, isOtros: true, isNuevo: false, initPct: otrosVotos / vc * 100,
       }] : []),
+      // Extra parties added by user (global, 0% base)
+      ...extraParties.map(ep => ({
+        id: ep.id, label: ep.label, denominacion: "",
+        bloque: ep.bloque ?? null, escanos2023: 0,
+        isBlancos: false, isOtros: false, isNuevo: true, initPct: 0,
+      })),
       {
         id: BLANCO_ID, label: "En blanco",
         denominacion: "Excluidos del reparto D'Hondt · parten de 0%",
         bloque: null, escanos2023: 0,
-        isBlancos: true, isOtros: false, initPct: 0,
+        isBlancos: true, isOtros: false, isNuevo: false, initPct: 0,
       },
     ];
   }
 
+  // ── State (pcts[] parallel to entries) ────────────────────────────
   function getState(cp) {
-    if (!provState[cp]) provState[cp] = getEntries(cp).map(e => e.initPct);
+    const entries = getEntries(cp);
+    if (!provState[cp]) {
+      provState[cp] = entries.map(e => e.initPct);
+    } else {
+      // Extend for newly added extra parties (inserted before blancos = last slot)
+      while (provState[cp].length < entries.length) {
+        provState[cp].splice(provState[cp].length - 1, 0, 0);
+      }
+    }
     return provState[cp];
   }
 
+  // ── D'Hondt per province ──────────────────────────────────────────
   function runDhondtProv(cp) {
     const p         = convData[cp];
     const seats2023 = p.seats_total;
@@ -126,7 +189,7 @@ const mainEl = (() => {
     return { sim: dhondt(cands, seats2026), entries, seats2026, seats2023 };
   }
 
-  // ── Helpers ───────────────────────────────────────────────────────────
+  // ── Seat bar helper ────────────────────────────────────────────────
   function buildSeatBar(label, escByBlock, seats, opacity) {
     const cont = document.createElement("div");
     cont.style.cssText = "flex:1";
@@ -162,7 +225,7 @@ const mainEl = (() => {
     return cont;
   }
 
-  // ── Root container ─────────────────────────────────────────────────────
+  // ── Root DOM ──────────────────────────────────────────────────────
   const wrap        = document.createElement("div");
   wrap.style.cssText = "max-width:780px";
   const progressWrap = document.createElement("div");
@@ -174,7 +237,7 @@ const mainEl = (() => {
   summaryWrap.style.display = "none";
   wrap.appendChild(summaryWrap);
 
-  // ── Progress ──────────────────────────────────────────────────────────
+  // ── Progress bar ──────────────────────────────────────────────────
   function renderProgress() {
     progressWrap.innerHTML = "";
     const row = document.createElement("div");
@@ -200,7 +263,7 @@ const mainEl = (() => {
     progressWrap.appendChild(track);
   }
 
-  // ── Province card ─────────────────────────────────────────────────────
+  // ── Province card ─────────────────────────────────────────────────
   function renderCard() {
     cardWrap.innerHTML = "";
     summaryWrap.style.display = "none";
@@ -250,144 +313,37 @@ const mainEl = (() => {
     totalEl.style.cssText = "font-size:.82em;font-weight:600;padding:4px 10px;border-radius:5px;margin-bottom:.7rem;display:inline-block";
     card.appendChild(totalEl);
 
-    // Grid
-    const grid = document.createElement("div");
-    grid.style.cssText = "display:grid;grid-template-columns:minmax(70px,150px) 60px 1fr 40px 40px 34px 22px;align-items:start;column-gap:8px;row-gap:3px";
-    card.appendChild(grid);
+    // Grid container (rebuilt when parties are added/removed)
+    const gridWrap = document.createElement("div");
+    card.appendChild(gridWrap);
 
-    // Header row
-    for (const [txt, align] of [
-      ["Partido","left"],["% voto","right"],
-      ["Slider  ·  banda = rango histórico 4 últ. elecciones","left"],
-      ["2023","center"],["Est.","center"],["Δ","center"],["",""]
-    ]) {
-      const h = document.createElement("div");
-      h.style.cssText = `font-size:.65em;opacity:.4;font-weight:600;border-bottom:1px solid #e0e0e0;padding-bottom:3px;text-align:${align}`;
-      h.textContent = txt;
-      grid.appendChild(h);
-    }
-
-    // Party rows
-    entries.forEach((e, i) => {
-      const col = e.bloque ? (COLORS[e.bloque] ?? "#999") : "#ccc";
-      const ref = (!e.isBlancos && !e.isOtros) ? (ranges[e.id] ?? null) : null;
-
-      // Name
-      const nameCell = document.createElement("div");
-      nameCell.style.cssText = "display:flex;align-items:center;gap:5px;overflow:hidden;padding-top:7px";
-      const dot = document.createElement("span");
-      dot.style.cssText = `width:8px;height:8px;border-radius:50%;background:${col};flex-shrink:0`;
-      nameCell.appendChild(dot);
-      const nm = document.createElement("span");
-      nm.style.cssText = "font-size:.8em;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis";
-      nm.textContent = e.label;
-      nm.title = e.denominacion ?? "";
-      nameCell.appendChild(nm);
-      grid.appendChild(nameCell);
-
-      // % input
-      const numInp = document.createElement("input");
-      numInp.type = "number"; numInp.min = "0"; numInp.max = "100"; numInp.step = "0.1";
-      numInp.value = pcts[i].toFixed(1);
-      numInp.style.cssText = "width:100%;font-size:.8em;border:1px solid #e0e0e0;border-radius:3px;padding:2px 4px;text-align:right;box-sizing:border-box;margin-top:5px";
-      const numCell = document.createElement("div");
-      numCell.appendChild(numInp);
-      grid.appendChild(numCell);
-
-      // Slider column (slider + reference band + labels)
-      const sliderCol = document.createElement("div");
-      sliderCol.style.cssText = "display:flex;flex-direction:column;padding-top:4px";
-
-      const slider = document.createElement("input");
-      slider.type = "range"; slider.min = "0"; slider.max = "100"; slider.step = "0.1";
-      slider.value = pcts[i].toFixed(1);
-      slider.style.cssText = `width:100%;accent-color:${e.isBlancos ? "#aaa" : col};margin:0 0 2px`;
-      sliderCol.appendChild(slider);
-
-      if (ref) {
-        const bLeft  = Math.min(ref.min, ref.max);
-        const bRight = Math.max(ref.min, ref.max);
-        const bWidth = bRight - bLeft;
-
-        // Reference band track
-        const refTrack = document.createElement("div");
-        refTrack.style.cssText = "position:relative;height:7px;margin:0 0 2px";
-
-        const trackBg = document.createElement("div");
-        trackBg.style.cssText = "position:absolute;top:50%;transform:translateY(-50%);left:0;right:0;height:2px;background:#e8e8e8;border-radius:1px";
-        refTrack.appendChild(trackBg);
-
-        const band = document.createElement("div");
-        band.style.cssText = `position:absolute;top:50%;transform:translateY(-50%);left:${bLeft}%;width:${bWidth}%;height:5px;background:${col}44;border:1px solid ${col}77;border-radius:2px`;
-        band.title = `Rango histórico: ${bLeft.toFixed(1)}% – ${bRight.toFixed(1)}%`;
-        refTrack.appendChild(band);
-
-        const minTick = document.createElement("div");
-        minTick.style.cssText = `position:absolute;top:0;left:${bLeft}%;transform:translateX(-50%);height:7px;width:1.5px;background:${col}99`;
-        refTrack.appendChild(minTick);
-
-        const maxTick = document.createElement("div");
-        maxTick.style.cssText = `position:absolute;top:0;left:${bRight}%;transform:translateX(-50%);height:7px;width:1.5px;background:${col}99`;
-        refTrack.appendChild(maxTick);
-
-        sliderCol.appendChild(refTrack);
-
-        // Min/max labels
-        const labelsRow = document.createElement("div");
-        labelsRow.style.cssText = "position:relative;height:11px;margin-bottom:1px";
-
-        const minLbl = document.createElement("span");
-        // Clamp label so it doesn't overflow at edges
-        const minLeft = Math.max(1, Math.min(bLeft, 95));
-        minLbl.style.cssText = `position:absolute;font-size:.58em;opacity:.4;left:${minLeft}%;transform:translateX(-50%);white-space:nowrap`;
-        minLbl.textContent = bLeft.toFixed(1) + "%";
-        labelsRow.appendChild(minLbl);
-
-        if (bWidth > 4) {
-          const maxLbl = document.createElement("span");
-          const maxLeft = Math.max(1, Math.min(bRight, 99));
-          maxLbl.style.cssText = `position:absolute;font-size:.58em;opacity:.4;left:${maxLeft}%;transform:translateX(-50%);white-space:nowrap`;
-          maxLbl.textContent = bRight.toFixed(1) + "%";
-          labelsRow.appendChild(maxLbl);
-        }
-        sliderCol.appendChild(labelsRow);
+    // Add party button
+    const addBtn = document.createElement("button");
+    addBtn.textContent = "+ Añadir partido";
+    addBtn.style.cssText = "margin-top:.7rem;font-size:.78em;border:1px dashed #aaa;border-radius:5px;padding:4px 13px;cursor:pointer;background:transparent;opacity:.7";
+    addBtn.addEventListener("click", () => {
+      nuevoCount++;
+      extraParties.push({ id: `__nuevo_${nuevoCount}__`, label: `Nuevo ${nuevoCount}`, bloque: null });
+      // Extend all existing province states
+      for (const cp2 of Object.keys(provState)) {
+        provState[cp2].splice(provState[cp2].length - 1, 0, 0);
       }
-
-      grid.appendChild(sliderCol);
-
-      // 2023 seats
-      const s23 = document.createElement("div");
-      s23.style.cssText = "text-align:center;font-size:.8em;opacity:.45;padding-top:7px";
-      s23.textContent = (e.isBlancos || e.isOtros) ? "—" : e.escanos2023;
-      grid.appendChild(s23);
-
-      // Sim seats
-      const sSim = document.createElement("div");
-      sSim.style.cssText = "text-align:center;font-size:.8em;font-weight:700;padding-top:7px";
-      sSim.className = "seats-sim";
-      grid.appendChild(sSim);
-
-      // Delta
-      const dEl = document.createElement("div");
-      dEl.style.cssText = "text-align:center;font-size:.8em;font-weight:700;padding-top:7px";
-      dEl.className = "seats-delta";
-      grid.appendChild(dEl);
-
-      // Reset button
-      const btn = document.createElement("button");
-      btn.textContent = "↺"; btn.title = "Restablecer a 2023";
-      btn.style.cssText = "font-size:.72em;border:none;background:transparent;cursor:pointer;opacity:.3;padding:1px 3px;margin-top:6px";
-      btn.addEventListener("click", () => {
-        pcts[i] = e.initPct;
-        slider.value = pcts[i].toFixed(1);
-        numInp.value = pcts[i].toFixed(1);
-        updateCard();
-      });
-      grid.appendChild(btn);
-
-      slider.addEventListener("input", () => { pcts[i] = +slider.value; numInp.value = pcts[i].toFixed(1); updateCard(); });
-      numInp.addEventListener("change", () => { pcts[i] = Math.max(0, Math.min(100, +numInp.value)); slider.value = pcts[i].toFixed(1); updateCard(); });
+      rebuildGrid();
+      updateCard();
     });
+    card.appendChild(addBtn);
+
+    // Reset province button
+    const resetProvBtn = document.createElement("button");
+    resetProvBtn.textContent = "↺ Restablecer";
+    resetProvBtn.style.cssText = "margin-top:.7rem;margin-left:8px;font-size:.78em;border:1px solid #ddd;border-radius:5px;padding:4px 12px;cursor:pointer;background:transparent;opacity:.6";
+    resetProvBtn.addEventListener("click", () => {
+      const ents = getEntries(cp);
+      ents.forEach((e, i) => { pcts[i] = e.initPct; });
+      rebuildGrid();
+      updateCard();
+    });
+    card.appendChild(resetProvBtn);
 
     // Navigation
     const navRow = document.createElement("div");
@@ -399,15 +355,6 @@ const mainEl = (() => {
     prevBtn.style.cssText = `font-size:.85em;border:1px solid #ddd;border-radius:5px;padding:6px 16px;cursor:pointer;background:transparent;opacity:${currentIdx === 0 ? ".3" : "1"}`;
     prevBtn.addEventListener("click", () => { currentIdx--; renderProgress(); renderCard(); window.scrollTo(0, 0); });
 
-    const resetProvBtn = document.createElement("button");
-    resetProvBtn.textContent = "↺ Restablecer provincia";
-    resetProvBtn.style.cssText = "font-size:.78em;border:1px solid #ddd;border-radius:5px;padding:5px 12px;cursor:pointer;background:transparent;opacity:.6";
-    resetProvBtn.addEventListener("click", () => {
-      const ents = getEntries(cp);
-      ents.forEach((e, i) => { pcts[i] = e.initPct; });
-      renderCard();
-    });
-
     const isLast = currentIdx === provList.length - 1;
     const nextBtn = document.createElement("button");
     nextBtn.textContent = isLast ? "Ver resultados nacionales →" : "Siguiente provincia →";
@@ -418,23 +365,182 @@ const mainEl = (() => {
     });
 
     navRow.appendChild(prevBtn);
-    navRow.appendChild(resetProvBtn);
     navRow.appendChild(nextBtn);
     card.appendChild(navRow);
     cardWrap.appendChild(card);
 
-    // ── Update function ────────────────────────────────────────────────
+    // ── Grid builder ───────────────────────────────────────────────
+    function rebuildGrid() {
+      gridWrap.innerHTML = "";
+      const ents = getEntries(cp);
+      const ps   = getState(cp);
+
+      const grid = document.createElement("div");
+      grid.style.cssText = "display:grid;grid-template-columns:minmax(70px,150px) 60px 1fr 40px 40px 34px 22px;align-items:start;column-gap:8px;row-gap:3px";
+      gridWrap.appendChild(grid);
+
+      // Header
+      for (const [txt, align] of [
+        ["Partido","left"],["% voto","right"],
+        ["Slider  ·  banda = rango histórico 4 últ. elecciones","left"],
+        ["2023","center"],["Est.","center"],["Δ","center"],["",""]
+      ]) {
+        const h = document.createElement("div");
+        h.style.cssText = `font-size:.65em;opacity:.4;font-weight:600;border-bottom:1px solid #e0e0e0;padding-bottom:3px;text-align:${align}`;
+        h.textContent = txt;
+        grid.appendChild(h);
+      }
+
+      ents.forEach((e, i) => {
+        const col = e.bloque ? (COLORS[e.bloque] ?? "#999") : "#ccc";
+        const ref = (!e.isBlancos && !e.isOtros && !e.isNuevo) ? (ranges[e.id] ?? null) : null;
+
+        // Name cell
+        const nameCell = document.createElement("div");
+        nameCell.style.cssText = "display:flex;align-items:center;gap:5px;overflow:hidden;padding-top:7px";
+        const dot = document.createElement("span");
+        dot.style.cssText = `width:8px;height:8px;border-radius:50%;background:${col};flex-shrink:0`;
+        nameCell.appendChild(dot);
+
+        if (e.isNuevo) {
+          const inp = document.createElement("input");
+          inp.type = "text"; inp.value = e.label; inp.placeholder = "Nombre";
+          inp.style.cssText = "font-size:.8em;font-weight:700;border:none;border-bottom:1px solid #ccc;background:transparent;width:100%;min-width:0;outline:none";
+          inp.addEventListener("input", () => {
+            e.label = inp.value;
+            const ep = extraParties.find(x => x.id === e.id);
+            if (ep) ep.label = inp.value;
+          });
+          nameCell.appendChild(inp);
+        } else {
+          const nm = document.createElement("span");
+          nm.style.cssText = "font-size:.8em;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis";
+          nm.textContent = e.label;
+          nm.title = e.denominacion ?? "";
+          nameCell.appendChild(nm);
+        }
+        grid.appendChild(nameCell);
+
+        // % input
+        const numInp = document.createElement("input");
+        numInp.type = "number"; numInp.min = "0"; numInp.max = "100"; numInp.step = "0.1";
+        numInp.value = ps[i].toFixed(1);
+        numInp.style.cssText = "width:100%;font-size:.8em;border:1px solid #e0e0e0;border-radius:3px;padding:2px 4px;text-align:right;box-sizing:border-box;margin-top:5px";
+        const numCell = document.createElement("div");
+        numCell.appendChild(numInp);
+        grid.appendChild(numCell);
+
+        // Slider + reference band
+        const sliderCol = document.createElement("div");
+        sliderCol.style.cssText = "display:flex;flex-direction:column;padding-top:4px";
+
+        const slider = document.createElement("input");
+        slider.type = "range"; slider.min = "0"; slider.max = "100"; slider.step = "0.1";
+        slider.value = ps[i].toFixed(1);
+        slider.style.cssText = `width:100%;accent-color:${e.isBlancos ? "#aaa" : col};margin:0 0 2px`;
+        sliderCol.appendChild(slider);
+
+        if (ref) {
+          const bLeft  = Math.min(ref.min, ref.max);
+          const bRight = Math.max(ref.min, ref.max);
+          const bWidth = bRight - bLeft;
+
+          const refTrack = document.createElement("div");
+          refTrack.style.cssText = "position:relative;height:7px;margin:0 0 2px";
+
+          const trackBg = document.createElement("div");
+          trackBg.style.cssText = "position:absolute;top:50%;transform:translateY(-50%);left:0;right:0;height:2px;background:#e8e8e8;border-radius:1px";
+          refTrack.appendChild(trackBg);
+
+          const band = document.createElement("div");
+          band.style.cssText = `position:absolute;top:50%;transform:translateY(-50%);left:${bLeft}%;width:${bWidth}%;height:5px;background:${col}44;border:1px solid ${col}77;border-radius:2px`;
+          band.title = `Rango histórico: ${bLeft.toFixed(1)}% – ${bRight.toFixed(1)}%`;
+          refTrack.appendChild(band);
+
+          const minTick = document.createElement("div");
+          minTick.style.cssText = `position:absolute;top:0;left:${bLeft}%;transform:translateX(-50%);height:7px;width:1.5px;background:${col}99`;
+          refTrack.appendChild(minTick);
+          const maxTick = document.createElement("div");
+          maxTick.style.cssText = `position:absolute;top:0;left:${bRight}%;transform:translateX(-50%);height:7px;width:1.5px;background:${col}99`;
+          refTrack.appendChild(maxTick);
+          sliderCol.appendChild(refTrack);
+
+          const labelsRow = document.createElement("div");
+          labelsRow.style.cssText = "position:relative;height:11px;margin-bottom:1px";
+          const minLbl = document.createElement("span");
+          minLbl.style.cssText = `position:absolute;font-size:.58em;opacity:.4;left:${Math.max(1, Math.min(bLeft, 94))}%;transform:translateX(-50%);white-space:nowrap`;
+          minLbl.textContent = bLeft.toFixed(1) + "%";
+          labelsRow.appendChild(minLbl);
+          if (bWidth > 4) {
+            const maxLbl = document.createElement("span");
+            maxLbl.style.cssText = `position:absolute;font-size:.58em;opacity:.4;left:${Math.max(1, Math.min(bRight, 99))}%;transform:translateX(-50%);white-space:nowrap`;
+            maxLbl.textContent = bRight.toFixed(1) + "%";
+            labelsRow.appendChild(maxLbl);
+          }
+          sliderCol.appendChild(labelsRow);
+        }
+
+        grid.appendChild(sliderCol);
+
+        // 2023 seats
+        const s23 = document.createElement("div");
+        s23.style.cssText = "text-align:center;font-size:.8em;opacity:.45;padding-top:7px";
+        s23.textContent = (e.isBlancos || e.isOtros || e.isNuevo) ? "—" : e.escanos2023;
+        grid.appendChild(s23);
+
+        // Sim seats
+        const sSim = document.createElement("div");
+        sSim.style.cssText = "text-align:center;font-size:.8em;font-weight:700;padding-top:7px";
+        sSim.className = "seats-sim";
+        grid.appendChild(sSim);
+
+        // Delta
+        const dEl = document.createElement("div");
+        dEl.style.cssText = "text-align:center;font-size:.8em;font-weight:700;padding-top:7px";
+        dEl.className = "seats-delta";
+        grid.appendChild(dEl);
+
+        // Action button: reset or remove
+        const btn = document.createElement("button");
+        btn.style.cssText = "font-size:.72em;border:none;background:transparent;cursor:pointer;opacity:.3;padding:1px 3px;margin-top:6px";
+        if (e.isNuevo) {
+          btn.textContent = "✕"; btn.title = "Eliminar partido";
+          btn.addEventListener("click", () => {
+            const idx = extraParties.findIndex(x => x.id === e.id);
+            if (idx !== -1) extraParties.splice(idx, 1);
+            // Remove from all province states
+            for (const cp2 of Object.keys(provState)) {
+              const ents2 = getEntries(cp2);
+              const eIdx  = ents2.findIndex(x => x.id === e.id);
+              if (eIdx !== -1) provState[cp2].splice(eIdx, 1);
+            }
+            rebuildGrid();
+            updateCard();
+          });
+        } else {
+          btn.textContent = "↺"; btn.title = "Restablecer a 2023";
+          btn.addEventListener("click", () => { ps[i] = e.initPct; slider.value = ps[i].toFixed(1); numInp.value = ps[i].toFixed(1); updateCard(); });
+        }
+        grid.appendChild(btn);
+
+        slider.addEventListener("input", () => { ps[i] = +slider.value; numInp.value = ps[i].toFixed(1); updateCard(); });
+        numInp.addEventListener("change", () => { ps[i] = Math.max(0, Math.min(100, +numInp.value)); slider.value = ps[i].toFixed(1); updateCard(); });
+      });
+    }
+
+    // ── Update ─────────────────────────────────────────────────────
     function updateCard() {
       const { sim, entries: ents, seats2026: s6, seats2023: s3 } = runDhondtProv(cp);
-      const total = pcts.reduce((s, v) => s + v, 0);
+      const ps    = getState(cp);
+      const total = ps.reduce((s, v) => s + v, 0);
       const diff  = total - 100;
       const ok    = Math.abs(diff) < 0.1;
-      if (ok)       { totalEl.textContent = "Total: 100% ✓"; totalEl.style.background = "#E8F5E9"; totalEl.style.color = "#2E7D32"; }
+      if (ok)        { totalEl.textContent = "Total: 100% ✓"; totalEl.style.background = "#E8F5E9"; totalEl.style.color = "#2E7D32"; }
       else if (diff > 0) { totalEl.textContent = `Total: ${total.toFixed(1)}% — exceso ${diff.toFixed(1)}%`; totalEl.style.background = "#FFEBEE"; totalEl.style.color = "#C62828"; }
-      else          { totalEl.textContent = `Total: ${total.toFixed(1)}% — falta ${(-diff).toFixed(1)}%`; totalEl.style.background = "#FFF8E1"; totalEl.style.color = "#E65100"; }
+      else           { totalEl.textContent = `Total: ${total.toFixed(1)}% — falta ${(-diff).toFixed(1)}%`; totalEl.style.background = "#FFF8E1"; totalEl.style.color = "#E65100"; }
 
-      const simCells   = grid.querySelectorAll(".seats-sim");
-      const deltaCells = grid.querySelectorAll(".seats-delta");
+      const simCells   = gridWrap.querySelectorAll(".seats-sim");
+      const deltaCells = gridWrap.querySelectorAll(".seats-delta");
       ents.forEach((e2, idx) => {
         const simS = e2.isBlancos ? null : (sim[e2.id] ?? 0);
         if (simCells[idx])   simCells[idx].textContent = simS === null ? "—" : simS;
@@ -461,10 +567,11 @@ const mainEl = (() => {
       barWrap.appendChild(buildSeatBar(`Estimado 2026 (${s6} esc)`, simByBlock, s6, 0.92));
     }
 
+    rebuildGrid();
     updateCard();
   }
 
-  // ── Summary ────────────────────────────────────────────────────────────
+  // ── National summary ──────────────────────────────────────────────
   function renderSummary() {
     summaryWrap.style.display = "";
     summaryWrap.innerHTML = "";
@@ -484,9 +591,8 @@ const mainEl = (() => {
         totalReal2023 += n;
       }
       for (const party of (convData[cp].partidos_con_escano ?? [])) {
-        if (party.escanos_dhondt > 0) {
+        if (party.escanos_dhondt > 0)
           seats2023ByParty[party.siglas] = (seats2023ByParty[party.siglas] ?? 0) + party.escanos_dhondt;
-        }
       }
       for (const [id, n] of Object.entries(sim)) {
         totalSeats[id] = (totalSeats[id] ?? 0) + n;
@@ -498,7 +604,6 @@ const mainEl = (() => {
 
     const maj = Math.ceil(totalSeatsCount / 2) + 1;
 
-    // Header
     const hdr = document.createElement("div");
     hdr.style.cssText = "margin-bottom:1.2rem";
     const h2 = document.createElement("h2");
@@ -511,24 +616,19 @@ const mainEl = (() => {
     hdr.appendChild(sub);
     summaryWrap.appendChild(hdr);
 
-    // National seat bars
     const natBars = document.createElement("div");
     natBars.style.cssText = "display:flex;gap:12px;margin-bottom:1rem";
     natBars.appendChild(buildSeatBar(`Real 2023 (${totalReal2023} esc)`, real2023ByBloc, totalReal2023, 0.72));
     natBars.appendChild(buildSeatBar(`Estimado 2026 (${totalSeatsCount} esc)`, totalByBloc, totalSeatsCount, 0.92));
     summaryWrap.appendChild(natBars);
 
-    // Majority info
     const majRow = document.createElement("div");
     majRow.style.cssText = "font-size:.83em;margin-bottom:1.2rem;padding:.5rem .9rem;background:var(--theme-background-alt,#f8f9fa);border-radius:6px;border:1px solid #e0e0e0;display:flex;flex-wrap:wrap;gap:12px";
-    const leftBlocs  = ["izq_federal","nac_izq"];
-    const rightBlocs = ["dcha_federal"];
-    const leftSeats  = leftBlocs.reduce((s, b) => s + (totalByBloc[b] ?? 0), 0);
-    const rightSeats = rightBlocs.reduce((s, b) => s + (totalByBloc[b] ?? 0), 0);
+    const leftSeats  = ["izq_federal","nac_izq"].reduce((s, b) => s + (totalByBloc[b] ?? 0), 0);
+    const rightSeats = ["dcha_federal"].reduce((s, b) => s + (totalByBloc[b] ?? 0), 0);
     majRow.innerHTML = `<b>Mayoría absoluta:</b> ${maj} &nbsp;·&nbsp; <span style="color:${COLORS.izq_federal}"><b>Izquierda federal:</b> ${leftSeats}</span> &nbsp;·&nbsp; <span style="color:${COLORS.dcha_federal}"><b>Derecha federal:</b> ${rightSeats}</span>`;
     summaryWrap.appendChild(majRow);
 
-    // Party table
     const tableHdr = document.createElement("div");
     tableHdr.style.cssText = "font-size:.78em;font-weight:700;opacity:.45;margin-bottom:.5rem;letter-spacing:.05em";
     tableHdr.textContent = "ESCAÑOS POR PARTIDO";
@@ -543,11 +643,7 @@ const mainEl = (() => {
       table.appendChild(h);
     }
 
-    const sorted = Object.entries(totalSeats)
-      .filter(([id]) => !id.startsWith("__"))
-      .sort((a, b) => b[1] - a[1]);
-
-    for (const [id, n] of sorted) {
+    for (const [id, n] of Object.entries(totalSeats).filter(([id]) => !id.startsWith("__")).sort((a, b) => b[1] - a[1])) {
       let bloque = "otros";
       for (const { cp } of provList) {
         const entry = getEntries(cp).find(e => e.id === id);
@@ -559,12 +655,10 @@ const mainEl = (() => {
 
       const nameDiv = document.createElement("div");
       nameDiv.style.cssText = "display:flex;align-items:center;gap:6px";
-      const dot = document.createElement("span");
-      dot.style.cssText = `width:7px;height:7px;border-radius:50%;background:${col};flex-shrink:0`;
-      nameDiv.appendChild(dot);
-      const nm = document.createElement("span");
-      nm.textContent = id;
-      nameDiv.appendChild(nm);
+      const dot2 = document.createElement("span");
+      dot2.style.cssText = `width:7px;height:7px;border-radius:50%;background:${col};flex-shrink:0`;
+      nameDiv.appendChild(dot2);
+      nameDiv.appendChild(Object.assign(document.createElement("span"), { textContent: id }));
       table.appendChild(nameDiv);
 
       const r = document.createElement("div");
@@ -584,7 +678,6 @@ const mainEl = (() => {
     }
     summaryWrap.appendChild(table);
 
-    // Back button
     const backBtn = document.createElement("button");
     backBtn.textContent = "← Volver a provincias";
     backBtn.style.cssText = "margin-top:1.5rem;font-size:.85em;border:1px solid #ddd;border-radius:5px;padding:7px 18px;cursor:pointer;background:transparent";
