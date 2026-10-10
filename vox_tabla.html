@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>VOX — Umbral D'Hondt por provincia · Nov. 2026</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0D1117; color: #F0F6FC; font-family: system-ui, -apple-system, sans-serif; padding: 24px; }
+  h1 { color: #F4A261; font-size: 1.3rem; margin-bottom: 4px; }
+  .subtitle { color: #8B949E; font-size: 0.85rem; margin-bottom: 20px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  thead th {
+    background: #161B22; color: #8B949E; font-weight: 600;
+    padding: 8px 10px; text-align: left; border-bottom: 2px solid #30363D;
+    position: sticky; top: 0; z-index: 10;
+  }
+  thead th.num { text-align: right; }
+  thead th.ctr { text-align: center; }
+  tbody tr { border-bottom: 1px solid #21262D; transition: background 0.1s; }
+  tbody tr:hover { background: #1C2128; }
+  td { padding: 6px 10px; vertical-align: middle; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.ctr { text-align: center; }
+  td.prov { font-weight: 600; }
+
+  .sep-row td {
+    background: #161B22; padding: 4px 10px; font-size: 0.72rem;
+    font-weight: 700; letter-spacing: 0.05em; border-bottom: none;
+    border-top: 2px solid #30363D;
+  }
+
+  .conf-muy  { color: #3FB950; }
+  .conf-prob { color: #52C46A; }
+  .conf-pos  { color: #D29922; }
+  .conf-poco { color: #F85149; }
+
+  .gain  { color: #3FB950; font-weight: 700; }
+  .same  { color: #8B949E; }
+  .loss  { color: #F85149; font-weight: 700; }
+  .gap   { font-weight: 700; }
+  .dots  { letter-spacing: 2px; }
+
+  /* Fragilidad */
+  .frag-filo     { color: #F85149; font-weight: 700; cursor: help; }
+  .frag-sensible { color: #D29922; font-weight: 700; cursor: help; }
+  .frag-none     { color: #3FB950; cursor: help; }
+
+  .legend { margin-top: 20px; color: #8B949E; font-size: 0.78rem; line-height: 2.0; border-top: 1px solid #30363D; padding-top: 12px; }
+  .legend b { color: #F0F6FC; }
+  .footer { margin-top: 10px; color: #484F58; font-size: 0.75rem; }
+
+  .pill {
+    display: inline-block; padding: 1px 6px; border-radius: 4px;
+    font-size: 0.72rem; font-weight: 600;
+  }
+  .pill-filo     { background: #F8514922; color: #F85149; border: 1px solid #F8514944; }
+  .pill-sensible { background: #D2992222; color: #D29922; border: 1px solid #D2992244; }
+  .pill-none     { background: #3FB95022; color: #3FB950; border: 1px solid #3FB95044; }
+  .party { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 0.70rem; font-weight: 700; margin: 1px; }
+  .p-sumar { background: #7C3AED33; color: #A78BFA; border: 1px solid #7C3AED55; }
+  .p-psoe  { background: #E53E3E33; color: #FC8181; border: 1px solid #E53E3E55; }
+  .p-pp    { background: #3182CE33; color: #90CDF4; border: 1px solid #3182CE55; }
+</style>
+</head>
+<body>
+<h1>VOX — ¿Dónde entra, dónde no? · Noviembre 2026</h1>
+<p class="subtitle">Umbral D'Hondt real por provincia · Swing uniforme sobre 23J · Encuesta 40dB/El País/SER oct. 2026 (N=800)</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Provincia</th>
+      <th class="num">Esc.</th>
+      <th class="num">VOX 19N%</th>
+      <th class="num">VOX 23J%</th>
+      <th class="num">VOX 26 est%</th>
+      <th class="num">Esc 23→26</th>
+      <th title="Partido(s) de los que VOX saca los escaños que gana en el swing base">Saca de</th>
+      <th class="ctr" title="Solidez del escaño que da el swing model">Swing fiable</th>
+      <th class="num">Umbral%</th>
+      <th class="num">Falta</th>
+      <th class="num" title="Escaños si VOX cruza el umbral del siguiente (+1 sobre swing base)">Si umbral ✓</th>
+      <th>Confianza</th>
+    </tr>
+  </thead>
+  <tbody id="tbody"></tbody>
+</table>
+
+<div class="legend">
+  <b>Columnas:</b><br>
+  <b>VOX 19N / 23J</b> = resultados reales nov.2019 y jul.2023 &nbsp;·&nbsp;
+  <b>VOX 26 est</b> = swing uniforme ×1.51 sobre 23J &nbsp;·&nbsp;
+  <b>Umbral</b> = % mínimo D'Hondt para ganar el <i>siguiente</i> escaño &nbsp;·&nbsp;
+  <b>Falta</b> = gap que VOX debe cerrar<br>
+  <b>Esc 23→26</b> = escaños reales 2023 → estimados swing base (sin cruzar umbral extra) &nbsp;·&nbsp;
+  <b>Saca de</b> = partido(s) de los que VOX saca los escaños que gana (D'Hondt 2023 real vs 2026 est.):
+  <span class="party p-sumar">SUMAR</span> <span class="party p-psoe">PSOE</span> <span class="party p-pp">PP</span> &nbsp;·&nbsp;
+  <b>Si umbral ✓</b> = escaños si además cruzan el umbral siguiente (+1)<br>
+  <br>
+  <b>Swing fiable</b> — solidez del escaño que el swing base ya da a VOX:<br>
+  &nbsp;&nbsp;<span class="pill pill-filo">⚠ en el filo</span> = VOX gana ese escaño con su propio primer divisor (VOX/1 = último coeficiente ganador) — si baja 1-2pp lo pierde<br>
+  &nbsp;&nbsp;<span class="pill pill-sensible">~ sensible</span> = pierde el escaño si VOX cae un 5% de sus votos<br>
+  &nbsp;&nbsp;<span class="pill pill-none">✓ sólido</span> = tiene margen suficiente sobre el umbral de ese escaño
+</div>
+<p class="footer">mapa electoral spain · 10/10/2026</p>
+
+<script>
+const data = [
+  // [provincia, esc, vox19, vox23, vox26, umbral, gap, esc23, esc26, conf, fragile, last_q_pct]
+  // -- MUY PROBABLE --
+  ["Segovia", 3, 17.3, 14.3, 21.3, 21.5, 0.2, 0, 0, "MUY PROBABLE", "none", 21.5],
+  ["A Coruña", 8, 8.3, 5.1, 8.0, 8.6, 0.6, 0, 0, "MUY PROBABLE", "none", 8.58],
+  ["Madrid", 37, 18.5, 14.1, 21.7, 22.3, 0.6, 5, 8, "MUY PROBABLE", "none", 2.48],
+  ["Palencia", 3, 14.6, 13.0, 19.4, 20.0, 0.6, 0, 0, "MUY PROBABLE", "none", 20.02],
+  ["La Rioja", 4, 11.6, 9.9, 15.1, 16.0, 0.9, 0, 0, "MUY PROBABLE", "none", 16.01],
+  ["Asturias", 7, 16.1, 12.6, 19.7, 20.9, 1.3, 1, 1, "MUY PROBABLE", "none", 10.47],
+  ["Zamora", 3, 17.3, 13.3, 19.8, 21.2, 1.4, 0, 0, "MUY PROBABLE", "none", 21.19],
+  // -- PROBABLE --
+  ["Ceuta", 1, 35.5, 23.5, 33.1, 34.9, 1.8, 0, 0, "PROBABLE", "none", 34.86],
+  ["Cádiz", 9, 21.6, 15.4, 23.3, 25.3, 2.0, 1, 2, "PROBABLE", "none", 8.44],
+  ["Pontevedra", 7, 7.4, 4.8, 7.6, 10.0, 2.3, 0, 0, "PROBABLE", "none", 9.97],
+  ["Lleida", 4, 4.5, 6.9, 9.9, 12.5, 2.6, 0, 0, "PROBABLE", "none", 12.48],
+  ["Barcelona", 32, 6.4, 7.6, 11.7, 14.3, 2.7, 2, 4, "PROBABLE", "none", 2.87],
+  // -- POSIBLE --
+  ["Córdoba", 6, 18.8, 14.1, 21.6, 24.8, 3.2, 1, 1, "POSIBLE", "none", 12.38],
+  ["Navarra", 5, 5.9, 5.8, 8.5, 11.9, 3.4, 0, 0, "POSIBLE", "none", 11.92],
+  ["Alacant/Alicante", 12, 19.8, 16.4, 24.7, 28.3, 3.5, 2, 3, "POSIBLE", "none", 7.07],
+  ["Illes Balears", 8, 17.2, 15.4, 23.6, 27.2, 3.6, 1, 2, "POSIBLE", "none", 9.07],
+  ["València/Valencia", 16, 17.8, 15.3, 23.7, 27.6, 3.9, 2, 4, "POSIBLE", "none", 5.52],
+  ["Málaga", 11, 21.7, 16.6, 25.0, 29.4, 4.4, 2, 3, "POSIBLE", "none", 7.35],
+  ["Castelló/Castellón", 5, 18.8, 16.0, 24.4, 29.2, 4.7, 1, 1, "POSIBLE", "none", 14.59],
+  // -- POCO PROBABLE --
+  ["Sevilla", 12, 18.2, 13.5, 20.9, 26.7, 5.8, 1, 3, "POCO PROBABLE", "sensible", 6.66],
+  ["Valladolid", 5, 18.3, 15.3, 22.9, 28.7, 5.8, 1, 1, "POCO PROBABLE", "none", 14.35],
+  ["Ciudad Real", 5, 21.1, 16.4, 24.3, 30.7, 6.4, 1, 1, "POCO PROBABLE", "none", 15.33],
+  ["Las Palmas", 8, 13.4, 14.7, 21.6, 28.1, 6.4, 1, 2, "POCO PROBABLE", "none", 9.35],
+  ["Bizkaia", 8, 2.4, 2.7, 3.9, 10.4, 6.5, 0, 0, "POCO PROBABLE", "none", 10.4],
+  ["Almería", 6, 26.9, 21.4, 30.7, 37.4, 6.7, 1, 2, "POCO PROBABLE", "none", 12.47],
+  ["Cantabria", 5, 15.0, 14.2, 21.4, 29.4, 8.0, 1, 1, "POCO PROBABLE", "none", 14.69],
+  ["Ourense", 4, 7.8, 4.9, 7.5, 16.2, 8.7, 0, 0, "POCO PROBABLE", "none", 16.21],
+  ["Gipuzkoa", 6, 1.9, 2.1, 3.0, 11.9, 8.8, 0, 0, "POCO PROBABLE", "none", 11.88],
+  ["Huelva", 5, 21.2, 14.8, 22.4, 32.0, 9.6, 1, 1, "POCO PROBABLE", "none", 15.99],
+  ["Jaén", 5, 19.9, 14.9, 22.2, 31.8, 9.6, 1, 1, "POCO PROBABLE", "none", 15.9],
+  ["Lugo", 4, 8.2, 4.4, 6.7, 16.3, 9.6, 0, 0, "POCO PROBABLE", "none", 16.31],
+  ["Santa Cruz de Tenerife", 7, 11.6, 0.0, 0.0, 10.5, 10.5, 0, 0, "POCO PROBABLE", "none", 10.53],
+  ["Tarragona", 6, 8.1, 10.4, 15.3, 25.9, 10.6, 0, 1, "POCO PROBABLE", "none", 12.94],
+  ["Soria", 2, 13.7, 9.9, 14.3, 25.0, 10.7, 0, 0, "POCO PROBABLE", "none", 24.98],
+  ["Granada", 7, 20.9, 16.3, 24.5, 35.5, 11.0, 1, 2, "POCO PROBABLE", "none", 11.84],
+  ["Araba/Álava", 4, 3.8, 3.9, 5.8, 17.0, 11.1, 0, 0, "POCO PROBABLE", "none", 16.98],
+  ["Zaragoza", 7, 18.2, 15.4, 23.4, 34.8, 11.4, 1, 2, "POCO PROBABLE", "none", 11.59],
+  ["Girona", 6, 5.2, 7.1, 10.3, 22.6, 12.3, 0, 1, "POCO PROBABLE", "filo", 10.31],
+  ["Albacete", 4, 20.9, 16.8, 24.8, 37.7, 12.9, 0, 1, "POCO PROBABLE", "none", 18.84],
+  ["Toledo", 6, 23.8, 19.8, 28.9, 41.7, 12.9, 1, 2, "POCO PROBABLE", "none", 13.91],
+  ["Badajoz", 5, 17.5, 13.8, 20.8, 34.6, 13.9, 1, 1, "POCO PROBABLE", "none", 17.32],
+  ["Murcia", 10, 28.2, 22.0, 31.6, 47.1, 15.5, 2, 4, "POCO PROBABLE", "filo", 7.9],
+  ["León", 4, 15.7, 13.0, 19.2, 34.8, 15.6, 0, 1, "POCO PROBABLE", "none", 17.39],
+  ["Cáceres", 4, 16.2, 13.7, 20.7, 36.5, 15.8, 0, 1, "POCO PROBABLE", "none", 18.25],
+  ["Burgos", 4, 15.1, 12.9, 19.5, 39.3, 19.8, 0, 1, "POCO PROBABLE", "filo", 19.5],
+  ["Melilla", 1, 18.5, 16.1, 23.1, 45.0, 21.9, 0, 0, "POCO PROBABLE", "none", 44.97],
+  ["Salamanca", 4, 18.1, 14.8, 21.8, 44.1, 22.3, 0, 1, "POCO PROBABLE", "filo", 21.83],
+  ["Ávila", 3, 18.7, 15.5, 22.4, 46.3, 23.9, 0, 1, "POCO PROBABLE", "filo", 22.39],
+  ["Guadalajara", 3, 24.2, 19.4, 28.5, 56.8, 28.3, 1, 1, "POCO PROBABLE", "none", 28.38],
+  ["Teruel", 3, 12.7, 13.2, 19.0, 49.5, 30.4, 0, 1, "POCO PROBABLE", "filo", 19.02],
+  ["Huesca", 3, 15.4, 12.8, 19.5, 60.4, 40.8, 0, 1, "POCO PROBABLE", "filo", 19.53],
+  ["Cuenca", 3, 18.6, 15.7, 23.3, 65.0, 41.7, 0, 1, "POCO PROBABLE", "filo", 23.29],
+];
+
+// Qué partido(s) pierde(n) escaños cuando VOX los gana (swing base 2026 vs 2023 real)
+const gainFrom = {
+  "Madrid":              ["SUMAR"],
+  "Cádiz":               ["SUMAR"],
+  "Barcelona":           ["SUMAR"],
+  "Alacant/Alicante":    ["SUMAR"],
+  "Illes Balears":       ["SUMAR"],
+  "València/Valencia":   ["SUMAR"],
+  "Málaga":              ["SUMAR"],
+  "Sevilla":             ["SUMAR"],
+  "Las Palmas":          ["PP"],
+  "Almería":             ["PSOE"],
+  "Tarragona":           ["SUMAR"],
+  "Granada":             ["SUMAR"],
+  "Zaragoza":            ["SUMAR"],
+  "Girona":              ["SUMAR"],
+  "Albacete":            ["PSOE"],
+  "Toledo":              ["PP"],
+  "Murcia":              ["PSOE","SUMAR"],
+  "León":                ["PSOE"],
+  "Cáceres":             ["PSOE"],
+  "Burgos":              ["PSOE"],
+  "Salamanca":           ["PP"],
+  "Ávila":               ["PP"],
+  "Teruel":              ["PP"],
+  "Huesca":              ["PP"],
+  "Cuenca":              ["PP"],
+};
+const partyClass = { "SUMAR": "p-sumar", "PSOE": "p-psoe", "PP": "p-pp" };
+
+const confClass = {
+  "MUY PROBABLE": "conf-muy",
+  "PROBABLE":     "conf-prob",
+  "POSIBLE":      "conf-pos",
+  "POCO PROBABLE":"conf-poco",
+};
+const confDots = {
+  "MUY PROBABLE": "●●●●○",
+  "PROBABLE":     "●●●○○",
+  "POSIBLE":      "●●○○○",
+  "POCO PROBABLE":"●○○○○",
+};
+const fragLabel = {
+  "filo":     '<span class="pill pill-filo" title="VOX gana ese escaño con su propio primer divisor — si baja 1-2pp lo pierde">⚠ en el filo</span>',
+  "sensible": '<span class="pill pill-sensible" title="Pierde el escaño si VOX cae un 5% de sus votos">~ sensible</span>',
+  "none":     '<span class="pill pill-none">✓ sólido</span>',
+};
+
+const tbody = document.getElementById("tbody");
+let prevConf = null;
+
+data.forEach(r => {
+  const [prov, esc, v19, v23, v26, umb, gap, s23, s26, conf, fragile, lq] = r;
+  const cc = confClass[conf];
+
+  if (conf !== prevConf) {
+    const sep = document.createElement("tr");
+    sep.className = "sep-row";
+    sep.innerHTML = `<td colspan="12" class="${cc}">${conf}</td>`;
+    tbody.appendChild(sep);
+    prevConf = conf;
+  }
+
+  const escStr = s23 === s26
+    ? `<span class="same">${s26}</span>`
+    : s26 > s23
+      ? `<span class="gain">${s23}→${s26}</span>`
+      : `<span class="loss">${s23}→${s26}</span>`;
+
+  // Si el swing da 0 escaños, no hay "fiabilidad" que mostrar
+  const fragCell = s26 === 0
+    ? '<span style="color:#484F58">—</span>'
+    : fragLabel[fragile] || '';
+
+  // ¿De quién saca VOX los escaños?
+  const losers = s26 > s23 ? (gainFrom[prov] || []) : [];
+  const gainCell = losers.length
+    ? losers.map(p => `<span class="party ${partyClass[p] || ''}">${p}</span>`).join(' ')
+    : '<span style="color:#484F58">—</span>';
+
+  const tr = document.createElement("tr");
+  tr.innerHTML = `
+    <td class="prov">${prov}</td>
+    <td class="num">${esc}</td>
+    <td class="num">${v19.toFixed(1)}%</td>
+    <td class="num">${v23.toFixed(1)}%</td>
+    <td class="num"><b>${v26.toFixed(1)}%</b></td>
+    <td class="num">${escStr}</td>
+    <td>${gainCell}</td>
+    <td class="ctr">${fragCell}</td>
+    <td class="num">${umb.toFixed(1)}%</td>
+    <td class="num gap ${cc}">+${gap.toFixed(1)}pp</td>
+    <td class="num"><b class="${cc}">${s26 + 1}</b></td>
+    <td class="${cc}"><span class="dots">${confDots[conf]}</span> ${conf}</td>
+  `;
+  tbody.appendChild(tr);
+});
+</script>
+</body>
+</html>

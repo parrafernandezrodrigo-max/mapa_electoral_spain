@@ -15,5 +15,6 @@ export default {
     { name: "Barrera electoral",          path: "/evolucion" },
     { name: "Bloques ideológicos",        path: "/bloques" },
     { name: "¿Y si hubieran ido juntos?", path: "/simulador" },
+    { name: "Análisis encuesta 40dB",     path: "/analisis_40db" },
   ],
 };

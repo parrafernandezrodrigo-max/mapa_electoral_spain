@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Análisis escaños · Encuesta 40dB/El País · Nov. 2026</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #0D1117; color: #F0F6FC;
+  font-family: system-ui, -apple-system, sans-serif;
+  padding: 0 0 40px;
+}
+
+/* ── Cabecera ── */
+.page-header {
+  background: #161B22; border-bottom: 1px solid #30363D;
+  padding: 20px 28px 16px;
+}
+.page-header h1 { font-size: 1.25rem; color: #F0F6FC; font-weight: 700; }
+.page-header .meta { color: #8B949E; font-size: 0.82rem; margin-top: 4px; }
+.moe-badge {
+  display: inline-block; background: #1C2128; border: 1px solid #388BFD55;
+  color: #79C0FF; font-size: 0.75rem; font-weight: 600;
+  padding: 2px 8px; border-radius: 4px; margin-left: 8px;
+}
+
+/* ── Metodología ── */
+.methodology {
+  background: #161B22; border: 1px solid #30363D;
+  margin: 20px 28px; padding: 16px 20px; border-radius: 8px;
+  font-size: 0.82rem; line-height: 1.7; color: #C9D1D9;
+}
+.methodology h2 { font-size: 0.9rem; color: #F0F6FC; margin-bottom: 10px; letter-spacing: 0.04em; }
+.methodology b  { color: #F0F6FC; }
+.tier-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.tier-pill {
+  display: flex; align-items: center; gap: 6px;
+  background: #0D1117; border: 1px solid #30363D;
+  border-radius: 6px; padding: 5px 10px; font-size: 0.78rem;
+}
+.tier-dot { font-size: 1rem; line-height: 1; }
+
+/* ── Resumen nacional ── */
+.nat-summary {
+  display: flex; gap: 12px; flex-wrap: wrap;
+  margin: 0 28px 20px; padding: 14px 18px;
+  background: #161B22; border: 1px solid #30363D; border-radius: 8px;
+}
+.nat-card {
+  flex: 1; min-width: 110px;
+  background: #0D1117; border: 1px solid #21262D;
+  border-radius: 6px; padding: 10px 12px; text-align: center;
+}
+.nat-card .party-name { font-weight: 700; font-size: 0.85rem; }
+.nat-card .seats { font-size: 1.4rem; font-weight: 700; }
+.nat-card .seats-change { font-size: 0.75rem; color: #8B949E; }
+.nat-card .pct { font-size: 0.75rem; color: #8B949E; margin-top: 2px; }
+.bloc-bar {
+  margin: 0 28px 16px; padding: 10px 18px;
+  background: #161B22; border: 1px solid #30363D; border-radius: 8px;
+  font-size: 0.82rem; color: #C9D1D9;
+}
+.bloc-bar b { color: #F0F6FC; }
+
+/* ── Tabs ── */
+.party-tabs {
+  display: flex; gap: 4px;
+  padding: 0 28px; margin-bottom: 0;
+  border-bottom: 2px solid #21262D;
+}
+.tab-btn {
+  background: none; border: none; cursor: pointer;
+  padding: 10px 18px; font-size: 0.85rem; font-weight: 600;
+  color: #484F58; border-bottom: 3px solid transparent;
+  margin-bottom: -2px; transition: color 0.15s;
+}
+.tab-btn:hover { color: #8B949E; }
+.tab-btn.active { border-bottom-color: currentColor; }
+
+/* ── Tablas ── */
+.party-section { display: none; padding: 0 28px; }
+.party-section.active { display: block; }
+
+.section-summary {
+  margin: 14px 0 10px; padding: 10px 14px;
+  background: #161B22; border: 1px solid #21262D; border-radius: 6px;
+  font-size: 0.82rem; color: #8B949E;
+}
+.section-summary b { color: #F0F6FC; }
+
+table { width: 100%; border-collapse: collapse; font-size: 0.80rem; margin-bottom: 20px; }
+thead th {
+  background: #161B22; color: #8B949E; font-weight: 600;
+  padding: 8px 9px; text-align: left; border-bottom: 2px solid #30363D;
+  position: sticky; top: 0; z-index: 10; white-space: nowrap;
+}
+thead th.num { text-align: right; }
+thead th.ctr { text-align: center; }
+tbody tr { border-bottom: 1px solid #21262D; transition: background 0.1s; }
+tbody tr:hover { background: #1C2128; }
+td { padding: 5px 9px; vertical-align: middle; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.ctr { text-align: center; }
+td.prov { font-weight: 600; }
+
+.sep-row td {
+  background: #161B22; padding: 3px 9px; font-size: 0.71rem;
+  font-weight: 700; letter-spacing: 0.05em;
+  border-bottom: none; border-top: 2px solid #30363D;
+}
+
+/* Confianza colores */
+.c-seguro  { color: #F78166; }
+.c-muy     { color: #3FB950; }
+.c-prob    { color: #52C46A; }
+.c-pos     { color: #D29922; }
+.c-poco    { color: #8B949E; }
+
+/* Pills */
+.pill {
+  display: inline-block; padding: 1px 6px; border-radius: 4px;
+  font-size: 0.70rem; font-weight: 700; margin: 1px;
+}
+.frag-filo     { background: #F8514922; color: #F85149; border: 1px solid #F8514944; cursor: help; }
+.frag-sensible { background: #D2992222; color: #D29922; border: 1px solid #D2992244; cursor: help; }
+.frag-none     { background: #3FB95022; color: #3FB950; border: 1px solid #3FB95044; cursor: help; }
+
+/* Colores por partido */
+.p-VOX    { background: #3FB95022; color: #3FB950; border: 1px solid #3FB95044; }
+.p-PP     { background: #60A5FA22; color: #60A5FA; border: 1px solid #60A5FA44; }
+.p-PSOE   { background: #F8717122; color: #F87171; border: 1px solid #F8717144; }
+.p-SUMAR  { background: #C084FC22; color: #C084FC; border: 1px solid #C084FC44; }
+.p-IZQ    { background: #E879F922; color: #E879F9; border: 1px solid #E879F944; }
+.p-PODEMOS{ background: #A78BFA22; color: #A78BFA; border: 1px solid #A78BFA44; }
+.p-SALF   { background: #FB923C22; color: #FB923C; border: 1px solid #FB923C44; }
+.p-other  { background: #6B728022; color: #9CA3AF; border: 1px solid #6B728044; }
+
+.gain  { color: #3FB950; font-weight: 700; }
+.loss  { color: #F85149; font-weight: 700; }
+.same  { color: #8B949E; }
+.dots  { letter-spacing: 2px; }
+</style>
+</head>
+<body>
+
+<header class="page-header">
+  <h1>Análisis de escaños por provincia — Noviembre 2026
+    <span class="moe-badge">MoE ±3,5pp · IC 95%</span>
+  </h1>
+  <p class="meta">
+    Encuesta 40dB/El País/SER · Octubre 2026 · N=800 ·
+    Swing uniforme sobre resultados reales 23J (D'Hondt real por provincia)
+  </p>
+</header>
+
+<section class="methodology">
+  <h2>Metodología</h2>
+  <p>
+    <b>Swing model:</b> se aplica un factor proporcional uniforme a los votos reales de cada partido en cada provincia
+    (factor = estimación 40dB / resultado 23J nacional), y se recalcula el reparto de escaños con D'Hondt.
+    El <b>umbral</b> es el % mínimo que necesita un partido para ganar el escaño siguiente al que ya le da el swing —
+    calculado con búsqueda binaria exacta sobre D'Hondt. El <b>gap</b> es la distancia entre la estimación y ese umbral.
+  </p>
+  <p style="margin-top:8px">
+    <b>Niveles de confianza</b> calibrados sobre el MoE de la encuesta (N=800 → ±3,5pp al 95%):
+  </p>
+  <div class="tier-row">
+    <div class="tier-pill"><span class="tier-dot c-seguro">●●●●●</span> <b>SEGURO</b> — gap ≤ 0: el swing ya cruza el umbral sin ayuda externa</div>
+    <div class="tier-pill"><span class="tier-dot c-muy">●●●●○</span> <b>MUY PROBABLE</b> — gap 0–1,5pp: dentro de la mitad del MoE; una pequeña desviación lo cierra</div>
+    <div class="tier-pill"><span class="tier-dot c-prob">●●●○○</span> <b>PROBABLE</b> — gap 1,5–3pp: dentro del MoE; el escaño es alcanzable si la encuesta está en el límite</div>
+    <div class="tier-pill"><span class="tier-dot c-pos">●●○○○</span> <b>POSIBLE</b> — gap 3–5pp: entre 1× y 1,5× el MoE; necesita sobrerrendimiento moderado</div>
+    <div class="tier-pill"><span class="tier-dot c-poco">●○○○○</span> <b>POCO PROBABLE</b> — gap &gt; 5pp: requiere una desviación superior al MoE; escenario de baja probabilidad</div>
+  </div>
+</section>
+
+<div class="nat-summary" id="nat-summary"></div>
+<div class="bloc-bar" id="bloc-bar"></div>
+
+<nav class="party-tabs" id="party-tabs"></nav>
+
+<div id="party-sections"></div>
+
+<script src="data/all_parties_data.js"></script>
+<script>
+// ── Configuración de partidos ──────────────────────────────────────────────
+const PARTIES = [
+  { key: 'VOX',   label: 'VOX',       color: '#3FB950', pct26: 18.9 },
+  { key: 'PP',    label: 'PP',        color: '#60A5FA', pct26: 31.9 },
+  { key: 'PSOE',  label: 'PSOE',      color: '#F87171', pct26: 28.1 },
+  { key: 'SUMAR', label: 'SUMAR',     color: '#C084FC', pct26:  5.3 },
+  { key: 'IZQ',   label: 'Izquierda (SUMAR+Pod.)', color: '#E879F9', pct26: 7.6 },
+];
+
+const CONF_CLASS = {
+  'SEGURO':        'c-seguro',
+  'MUY PROBABLE':  'c-muy',
+  'PROBABLE':      'c-prob',
+  'POSIBLE':       'c-pos',
+  'POCO PROBABLE': 'c-poco',
+};
+const CONF_DOTS = {
+  'SEGURO':        '●●●●●',
+  'MUY PROBABLE':  '●●●●○',
+  'PROBABLE':      '●●●○○',
+  'POSIBLE':       '●●○○○',
+  'POCO PROBABLE': '●○○○○',
+};
+const FRAG_LABEL = {
+  'filo':     '<span class="pill frag-filo" title="Gana el último escaño con su primer divisor — pierde el asiento con −1pp">⚠ en el filo</span>',
+  'sensible': '<span class="pill frag-sensible" title="Pierde el escaño si cae un 5% de sus votos">~ sensible</span>',
+  'none':     '<span class="pill frag-none">✓ sólido</span>',
+};
+
+function partyBadge(name) {
+  const cls = ['VOX','PP','PSOE','SUMAR','IZQ','PODEMOS','SALF'].includes(name)
+    ? `p-${name}` : 'p-other';
+  const label = name === 'IZQ' ? 'Izq.' : name;
+  return `<span class="pill ${cls}">${label}</span>`;
+}
+
+// ── Resumen nacional ──────────────────────────────────────────────────────
+const sumEl = document.getElementById('nat-summary');
+PARTIES.forEach(party => {
+  const s = partySummaries[party.key];
+  const diff = s.seats26 - s.seats23;
+  const diffStr = diff > 0 ? `+${diff}` : `${diff}`;
+  const diffClass = diff > 0 ? 'gain' : diff < 0 ? 'loss' : 'same';
+  sumEl.innerHTML += `
+    <div class="nat-card">
+      <div class="party-name" style="color:${party.color}">${party.label}</div>
+      <div class="seats" style="color:${party.color}">${s.seats26}</div>
+      <div class="seats-change">
+        <span class="${diffClass}">${diffStr}</span> vs 2023 (${s.seats23})
+      </div>
+      <div class="pct">${party.pct26}% encuesta</div>
+    </div>`;
+});
+
+// ── Barra de bloques ──────────────────────────────────────────────────────
+const pp26   = partySummaries['PP'].seats26;
+const vox26  = partySummaries['VOX'].seats26;
+const psoe26 = partySummaries['PSOE'].seats26;
+const izq26  = partySummaries['IZQ'].seats26;
+const derecha = pp26 + vox26;
+const MAYORIA = 176;
+document.getElementById('bloc-bar').innerHTML =
+  `<b>Bloque derecha</b> (PP+VOX): <b style="color:#60A5FA">${pp26}</b> + <b style="color:#3FB950">${vox26}</b> = <b>${derecha}</b>
+   <span style="color:${derecha >= MAYORIA ? '#3FB950' : '#F85149'}">
+     (${derecha >= MAYORIA ? '+' : ''}${derecha - MAYORIA} vs mayoría ${MAYORIA})
+   </span>
+   &nbsp;·&nbsp;
+   <b>Bloque izquierda</b> (PSOE+Izq.): <b style="color:#F87171">${psoe26}</b> + <b style="color:#E879F9">${izq26}</b> = <b>${psoe26+izq26}</b>`;
+
+// ── Tabs ──────────────────────────────────────────────────────────────────
+const tabsEl     = document.getElementById('party-tabs');
+const sectionsEl = document.getElementById('party-sections');
+
+PARTIES.forEach((party, idx) => {
+  // Tab button
+  const btn = document.createElement('button');
+  btn.className = 'tab-btn' + (idx === 0 ? ' active' : '');
+  btn.style.color = idx === 0 ? party.color : '';
+  btn.textContent = party.label;
+  btn.dataset.party = party.key;
+  btn.onclick = () => switchTab(party.key, party.color);
+  tabsEl.appendChild(btn);
+
+  // Section
+  const sec = document.createElement('div');
+  sec.className = 'party-section' + (idx === 0 ? ' active' : '');
+  sec.id = `section-${party.key}`;
+  sec.innerHTML = buildSection(party);
+  sectionsEl.appendChild(sec);
+});
+
+function switchTab(key, color) {
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    const isActive = b.dataset.party === key;
+    b.classList.toggle('active', isActive);
+    b.style.color = isActive ? PARTIES.find(p => p.key === key).color : '';
+  });
+  document.querySelectorAll('.party-section').forEach(s => {
+    s.classList.toggle('active', s.id === `section-${key}`);
+  });
+}
+
+function buildSection(party) {
+  const data   = allPartiesData[party.key];
+  const summ   = partySummaries[party.key];
+  const diff26 = summ.seats26 - summ.seats23;
+  const diffStr = diff26 > 0 ? `+${diff26}` : `${diff26}`;
+  const diffCls = diff26 > 0 ? 'gain' : diff26 < 0 ? 'loss' : 'same';
+
+  // Contar tiers
+  const tierCount = {};
+  data.forEach(r => { tierCount[r.conf] = (tierCount[r.conf] || 0) + 1; });
+
+  let html = `
+    <div class="section-summary">
+      <b style="color:${party.color}">${party.label}</b> · Estimación 2026: ${party.pct26}% ·
+      Escaños swing: <b>${summ.seats26}</b> (<span class="${diffCls}">${diffStr}</span> vs 2023) ·
+      SEGURO: ${tierCount['SEGURO']||0} prov. ·
+      MUY PROBABLE: ${tierCount['MUY PROBABLE']||0} ·
+      PROBABLE: ${tierCount['PROBABLE']||0} ·
+      POSIBLE: ${tierCount['POSIBLE']||0} ·
+      POCO PROBABLE: ${tierCount['POCO PROBABLE']||0}
+    </div>
+    <table>
+      <thead><tr>
+        <th>Provincia</th>
+        <th class="num">Esc.</th>
+        <th class="num">19N%</th>
+        <th class="num">23J%</th>
+        <th class="num"><b>26 est%</b></th>
+        <th class="num">Esc 23→26</th>
+        <th>Saca de</th>
+        <th class="ctr" title="Solidez del escaño que da el swing model">Swing fiable</th>
+        <th class="num">Umbral%</th>
+        <th class="num">Falta</th>
+        <th class="num" title="Escaños si cruzan el umbral siguiente (+1 sobre swing base)">Si umbral ✓</th>
+        <th>Confianza</th>
+      </tr></thead>
+      <tbody>${buildRows(data, party)}</tbody>
+      ${buildFoot(data, party)}
+    </table>`;
+  return html;
+}
+
+function buildFoot(data, party) {
+  const tot23 = data.reduce((a, r) => a + r.s23, 0);
+  const tot26 = data.reduce((a, r) => a + r.s26, 0);
+  const diff  = tot26 - tot23;
+  const dStr  = diff > 0 ? `+${diff}` : `${diff}`;
+  const dCls  = diff > 0 ? 'gain' : diff < 0 ? 'loss' : 'same';
+  return `<tfoot><tr style="border-top:2px solid #30363D;background:#161B22;font-weight:700">
+    <td colspan="5" style="padding:6px 9px;color:#8B949E;font-size:0.79rem">TOTAL 52 PROVINCIAS</td>
+    <td class="num" style="padding:6px 9px">
+      <span class="${dCls}">${tot23}→${tot26}</span>
+      &nbsp;<span class="${dCls}" style="font-size:0.75rem">(${dStr})</span>
+    </td>
+    <td colspan="6"></td>
+  </tr></tfoot>`;
+}
+
+function buildRows(data, party) {
+  let html = '';
+  let prevConf = null;
+  data.forEach(r => {
+    const cc = CONF_CLASS[r.conf];
+    if (r.conf !== prevConf) {
+      html += `<tr class="sep-row"><td colspan="12" class="${cc}">${r.conf}</td></tr>`;
+      prevConf = r.conf;
+    }
+    const escStr = r.s23 === r.s26
+      ? `<span class="same">${r.s26}</span>`
+      : r.s26 > r.s23
+        ? `<span class="gain">${r.s23}→${r.s26}</span>`
+        : `<span class="loss">${r.s23}→${r.s26}</span>`;
+
+    const gainCell = r.gain_from && r.gain_from.length
+      ? r.gain_from.map(partyBadge).join(' ')
+      : '<span style="color:#484F58">—</span>';
+
+    const fragCell = r.s26 === 0
+      ? '<span style="color:#484F58">—</span>'
+      : FRAG_LABEL[r.fragile] || '';
+
+    const gapStr  = r.gap > 0 ? `+${r.gap.toFixed(1)}pp` : `${r.gap.toFixed(1)}pp`;
+    const gapCls  = r.gap <= 0 ? 'c-seguro' : cc;
+
+    html += `<tr>
+      <td class="prov">${r.prov}</td>
+      <td class="num">${r.esc}</td>
+      <td class="num">${r.p19.toFixed(1)}%</td>
+      <td class="num">${r.p23.toFixed(1)}%</td>
+      <td class="num"><b>${r.p26.toFixed(1)}%</b></td>
+      <td class="num">${escStr}</td>
+      <td>${gainCell}</td>
+      <td class="ctr">${fragCell}</td>
+      <td class="num">${r.umbral.toFixed(1)}%</td>
+      <td class="num ${gapCls}"><b>${gapStr}</b></td>
+      <td class="num"><b class="${cc}">${r.s26 + 1}</b></td>
+      <td class="${cc}"><span class="dots">${CONF_DOTS[r.conf]}</span> ${r.conf}</td>
+    </tr>`;
+  });
+  return html;
+}
+</script>
+</body>
+</html>

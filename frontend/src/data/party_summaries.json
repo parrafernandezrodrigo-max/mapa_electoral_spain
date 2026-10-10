@@ -1,0 +1,22 @@
+{
+  "VOX": {
+    "seats23": 33,
+    "seats26": 65
+  },
+  "PP": {
+    "seats23": 136,
+    "seats26": 130
+  },
+  "PSOE": {
+    "seats23": 122,
+    "seats26": 112
+  },
+  "SUMAR": {
+    "seats23": 31,
+    "seats26": 5
+  },
+  "IZQ": {
+    "seats23": 31,
+    "seats26": 12
+  }
+}
