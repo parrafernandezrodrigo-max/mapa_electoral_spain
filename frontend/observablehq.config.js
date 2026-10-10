@@ -10,8 +10,8 @@ export default {
   </div>`,
   footer: "Fuente: Ministerio del Interior — Infoelectoral. Cálculo D'Hondt propio.",
   pages: [
-    { name: "Porra provincial 29-N",      path: "/estimador" },
-    { name: "Mapa Electoral histórico",   path: "/" },
+    { name: "Porra provincial 29-N",      path: "/" },
+    { name: "Mapa Electoral histórico",   path: "/mapa" },
     { name: "Barrera electoral",          path: "/evolucion" },
     { name: "Bloques ideológicos",        path: "/bloques" },
     { name: "¿Y si hubieran ido juntos?", path: "/simulador" },
