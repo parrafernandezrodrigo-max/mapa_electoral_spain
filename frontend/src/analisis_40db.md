@@ -105,7 +105,19 @@ article.observablehq--article,
   color:color-mix(in srgb, var(--theme-foreground) 60%, transparent);
   font-weight:600; padding:6px 7px; text-align:left;
   border-bottom:2px solid color-mix(in srgb, var(--theme-foreground) 15%, transparent);
-  position:sticky; top:0; z-index:5; white-space:nowrap; overflow:hidden;
+  position:sticky; top:26px; z-index:5; white-space:nowrap; overflow:hidden;
+}
+.enc-table thead tr.group-row th {
+  top:0; padding:3px 7px; font-size:.68rem; font-weight:400;
+  border-bottom:none;
+  color:color-mix(in srgb, var(--theme-foreground) 40%, transparent);
+}
+.enc-table thead tr.group-row .group-label {
+  text-align:center; font-weight:600; font-size:.70rem;
+  color:color-mix(in srgb, var(--theme-foreground) 70%, transparent);
+  border-bottom:2px solid color-mix(in srgb, var(--theme-foreground) 20%, transparent);
+  border-left:1px solid color-mix(in srgb, var(--theme-foreground) 12%, transparent);
+  border-right:1px solid color-mix(in srgb, var(--theme-foreground) 12%, transparent);
 }
 .enc-table thead th.r { text-align:right; }
 .enc-table thead th.c { text-align:center; }
@@ -132,8 +144,13 @@ article.observablehq--article,
 /* Saca de: ancho para 2 badges en la misma línea */
 .enc-table td.wrap { white-space:nowrap; min-width:130px; }
 /* Mínimos para columnas clave */
-.enc-table .col-conf { min-width:165px; }
-.enc-table .col-pct  { min-width:44px; }
+.enc-table .col-conf    { min-width:165px; }
+.enc-table .col-pct     { min-width:44px; }
+.enc-table .col-track   { min-width:110px; }
+/* Fiabilidad del swing provincial */
+.sw-fiable { background:#3FB95022; color:#3FB950; border:1px solid #3FB95044; cursor:help; }
+.sw-filo   { background:#D2992222; color:#D29922; border:1px solid #D2992244; cursor:help; }
+.sw-bad    { background:#F8514922; color:#F85149; border:1px solid #F8514944; cursor:help; }
 
 .enc-table tfoot tr {
   border-top:2px solid color-mix(in srgb, var(--theme-foreground) 18%, transparent);
@@ -154,7 +171,7 @@ article.observablehq--article,
 .p-PP   { background:#60A5FA22; color:#60A5FA; border:1px solid #60A5FA44; }
 .p-PSOE { background:#F8717122; color:#F87171; border:1px solid #F8717144; }
 .p-SUMAR{ background:#C084FC22; color:#C084FC; border:1px solid #C084FC44; }
-.p-IZQ  { background:#E879F922; color:#E879F9; border:1px solid #E879F944; }
+.p-OTROS{ background:#94A3B822; color:#94A3B8; border:1px solid #94A3B844; }
 .p-other{ background:#6B728022; color:#9CA3AF; border:1px solid #6B728044; }
 
 /* Colores semánticos */
@@ -196,6 +213,17 @@ article.observablehq--article,
     <div class="tier-pill"><span class="dots c-pos">●●○○○</span> <strong>POSIBLE</strong> — 3–5pp: entre 1× y 1,5× el MoE</div>
     <div class="tier-pill"><span class="dots c-poco">●○○○○</span> <strong>POCO PROBABLE</strong> — &gt; 5pp: supera el MoE</div>
   </div>
+  <p style="margin-top:8px">
+    La columna <strong>¿Swing prov. fiable?</strong> indica si tiene sentido aplicar el mismo swing nacional a esta provincia,
+    comparando cuánto se desvió la provincia del swing nacional en el ciclo 2019→2023.
+    La métrica es el ratio entre el swing real provincial y el swing nacional del mismo ciclo
+    (p. ej. si VOX bajó ×0,82 a nivel nacional pero ×0,77 en Málaga, el ratio es ×0,93).
+  </p>
+  <div class="tier-row">
+    <div class="tier-pill"><span class="pill sw-fiable">FIABLE ×0,93</span> — ratio entre ×0,75 y ×1,35: la provincia siguió el swing nacional; aplicar el lineal es razonable</div>
+    <div class="tier-pill"><span class="pill sw-filo">AL FILO ×0,62</span> — ratio entre ×0,50–×0,75 o ×1,35–×1,70: desvío moderado; el lineal puede sobreestimar o subestimar</div>
+    <div class="tier-pill"><span class="pill sw-bad">NO FIABLE ×1,86</span> — ratio fuera de ×0,50–×1,70: la provincia tuvo un comportamiento muy diferente al nacional; el lineal no es fiable aquí</div>
+  </div>
 </div>
 
 ```js
@@ -209,7 +237,7 @@ const PARTIES = [
   { key: "PP",    label: "PP",                   color: "#60A5FA", pct26: 31.9 },
   { key: "PSOE",  label: "PSOE",                 color: "#F87171", pct26: 28.1 },
   { key: "SUMAR", label: "SUMAR",                color: "#C084FC", pct26:  5.3 },
-  { key: "IZQ",   label: "Izquierda (SUMAR+Pod.)",color: "#E879F9", pct26:  7.6 },
+  { key: "OTROS", label: "Otros (ERC/Junts/PNV…)",color: "#94A3B8", pct26: null },
 ];
 
 const CONF_CLASS = {
@@ -235,8 +263,8 @@ const FRAG_LABEL = {
 };
 
 function partyBadge(name) {
-  const cls = ["VOX","PP","PSOE","SUMAR","IZQ"].includes(name) ? `p-${name}` : "p-other";
-  return `<span class="pill ${cls}">${name === "IZQ" ? "Izq." : name}</span>`;
+  const cls = ["VOX","PP","PSOE","SUMAR","OTROS"].includes(name) ? `p-${name}` : "p-other";
+  return `<span class="pill ${cls}">${name}</span>`;
 }
 ```
 
@@ -254,17 +282,19 @@ for (const p of PARTIES) {
       <div class="p-name" style="color:${p.color}">${p.label}</div>
       <div class="p-seats" style="color:${p.color}">${s.seats26}</div>
       <div class="p-delta"><span class="${dCls}">${dStr}</span> vs 2023 (${s.seats23})</div>
-      <div class="p-pct">${p.pct26}% encuesta</div>
+      <div class="p-pct">${p.pct26 !== null ? p.pct26 + "% encuesta" : "estimación swing"}</div>
     </div>`;
 }
 display(natDiv);
 
 // ── Barra de bloques ──────────────────────────────────────────────────────
-const pp26   = summaries.PP.seats26;
-const vox26  = summaries.VOX.seats26;
-const psoe26 = summaries.PSOE.seats26;
-const izq26  = summaries.IZQ.seats26;
+const pp26    = summaries.PP.seats26;
+const vox26   = summaries.VOX.seats26;
+const psoe26  = summaries.PSOE.seats26;
+const sumar26 = summaries.SUMAR.seats26;
+const otros26 = summaries.OTROS.seats26;
 const derecha = pp26 + vox26;
+const izqProg = psoe26 + sumar26;
 const MAYORIA = 176;
 const blocEl = document.createElement("div");
 blocEl.className = "bloc-bar";
@@ -277,10 +307,13 @@ blocEl.innerHTML = `
       (${derecha >= MAYORIA ? "+" : ""}${derecha - MAYORIA} vs mayoría ${MAYORIA})
     </span>
   </div>
-  <div><strong>Bloque izquierda</strong> (PSOE+Izq.):
+  <div><strong>Bloque progresista</strong> (PSOE+SUMAR):
     <strong style="color:#F87171">${psoe26}</strong> +
-    <strong style="color:#E879F9">${izq26}</strong> =
-    <strong>${psoe26 + izq26}</strong>
+    <strong style="color:#C084FC">${sumar26}</strong> =
+    <strong>${izqProg}</strong>
+  </div>
+  <div><strong>Otros</strong> (ERC/Junts/PNV…):
+    <strong style="color:#94A3B8">${otros26}</strong>
   </div>`;
 display(blocEl);
 ```
@@ -289,6 +322,21 @@ display(blocEl);
 // ── Tabs + tablas ─────────────────────────────────────────────────────────
 const TIER_ORDER = { 'SEGURO':0,'MUY PROBABLE':1,'PROBABLE':2,'POSIBLE':3,'POCO PROBABLE':4 };
 
+function trackingCell(t) {
+  if (t === null || t === undefined)
+    return `<td class="col-track"><span style="opacity:.3">—</span></td>`;
+  const fiable = t >= 0.75 && t <= 1.35;
+  const alFilo = (t >= 0.50 && t < 0.75) || (t > 1.35 && t <= 1.70);
+  const cls = fiable ? 'sw-fiable' : alFilo ? 'sw-filo' : 'sw-bad';
+  const lbl = fiable ? 'FIABLE'    : alFilo ? 'AL FILO' : 'NO FIABLE';
+  const tip = fiable
+    ? `La provincia siguió el swing nacional en 19→23 (×${t.toFixed(2)}): aplicar el swing lineal es razonable aquí`
+    : alFilo
+    ? `Desvío moderado respecto al swing nacional en 19→23 (×${t.toFixed(2)}): el swing lineal puede sobreestimar o subestimar`
+    : `Desvío alto respecto al swing nacional en 19→23 (×${t.toFixed(2)}): el swing lineal no es fiable para esta provincia`;
+  return `<td class="col-track"><span class="pill ${cls}" title="${tip}">${lbl} ×${t.toFixed(2)}</span></td>`;
+}
+
 function buildRows(data, sortKey, sortDir) {
   const sorted = [...data].sort((a, b) => {
     let va, vb;
@@ -296,37 +344,44 @@ function buildRows(data, sortKey, sortDir) {
     else if (sortKey === 'conf') { va = TIER_ORDER[a.conf] ?? 5; vb = TIER_ORDER[b.conf] ?? 5; }
     else                         { va = a[sortKey]; vb = b[sortKey]; }
     if (typeof va === 'string') return sortDir * va.localeCompare(vb, 'es');
+    if (va === null || va === undefined) return 1;
+    if (vb === null || vb === undefined) return -1;
     return sortDir * (va - vb);
   });
 
   return sorted.map(r => {
-    const cc  = CONF_CLASS[r.conf];
-    const cf  = CONF_CELL[r.conf];
+    const cf  = r.conf ? CONF_CELL[r.conf] : null;
     const escStr = r.s23 === r.s26
       ? `<span class="same">${r.s26}</span>`
       : r.s26 > r.s23
         ? `<span class="gain">${r.s23}→${r.s26}</span>`
         : `<span class="loss">${r.s23}→${r.s26}</span>`;
     const gainCell = r.gain_from?.length
-      ? r.gain_from.map(partyBadge).join(" ")
+      ? partyBadge(r.gain_from[0])
       : `<span style="opacity:.35">—</span>`;
-    const fragCell = (r.s26 <= r.s23)
+    const fragCell = (r.fragile === null || r.s26 <= r.s23)
       ? `<span style="opacity:.35">—</span>`
       : (FRAG_LABEL[r.fragile] ?? "");
-    const gapStr = r.gap > 0 ? `+${r.gap.toFixed(1)}pp` : `${r.gap.toFixed(1)}pp`;
+    const gapStr = (r.gap !== null && r.gap !== undefined)
+      ? (r.gap > 0 ? `+${r.gap.toFixed(1)}pp` : `${r.gap.toFixed(1)}pp`)
+      : '—';
     const filoNote = (r.fragile === 'filo' && r.s26 > r.s23)
       ? ` · ⚠ El último escaño ganado es AL FILO (el escaño actual se pierde con una bajada mínima)`
       : '';
+    const confCell = cf
+      ? `<td class="${cf.cls} col-conf" title="Gap al sig. escaño: ${gapStr} · Umbral: ${r.umbral.toFixed(1)}%${filoNote}"><span class="dots">${cf.dots}</span> ${cf.short}</td>`
+      : `<td class="col-conf"><span style="opacity:.3">—</span></td>`;
     return `<tr>
       <td class="prov">${r.prov}</td>
       <td class="r">${r.esc}</td>
       <td class="r">${r.p19.toFixed(1)}%</td>
       <td class="r">${r.p23.toFixed(1)}%</td>
       <td class="r"><strong>${r.p26.toFixed(1)}%</strong></td>
-      <td class="c">${fragCell}</td>
       <td class="r">${escStr}</td>
+      <td class="c">${fragCell}</td>
       <td class="wrap">${gainCell}</td>
-      <td class="${cf.cls} col-conf" title="Gap al sig. escaño: ${gapStr} · Umbral: ${r.umbral.toFixed(1)}%${filoNote}"><span class="dots">${cf.dots}</span> ${cf.short}</td>
+      ${confCell}
+      ${trackingCell(r.tracking)}
     </tr>`;
   }).join('');
 }
@@ -342,26 +397,33 @@ function buildTable(data) {
   const wrap = document.createElement('div');
   wrap.className = 'enc-table-wrap';
   wrap.innerHTML = `<table class="enc-table">
-    <thead><tr>
-      <th data-k="prov">Provincia</th>
-      <th class="r" data-k="esc" data-dir="desc">Esc.</th>
-      <th class="r col-pct" data-k="p19">2019%</th>
-      <th class="r col-pct" data-k="p23">2023%</th>
-      <th class="r col-pct" data-k="p26"><strong>2026 est%</strong></th>
-      <th class="c" title="Solidez del cambio de escaños del swing model" style="min-width:88px">Swing / último esc.</th>
-      <th class="r" data-k="diff">Esc 23→26</th>
-      <th>Saca de</th>
-      <th class="col-conf" data-k="gap" title="Distancia al umbral D'Hondt del siguiente escaño" style="min-width:150px">¿Cerca del sig.?</th>
-    </tr></thead>
+    <thead>
+      <tr class="group-row">
+        <th colspan="5"></th>
+        <th colspan="4" class="group-label">Análisis de estimación — encuesta 40dB</th>
+        <th></th>
+      </tr>
+      <tr>
+        <th data-k="prov">Provincia</th>
+        <th class="r" data-k="esc" data-dir="desc">Esc.</th>
+        <th class="r col-pct" data-k="p19">2019%</th>
+        <th class="r col-pct" data-k="p23">2023%</th>
+        <th class="r col-pct" data-k="p26"><strong>2026 est%</strong></th>
+        <th class="r" data-k="diff">Esc 23→26 est.</th>
+        <th class="c" title="¿El último escaño que gana el partido con este swing es sólido?">¿Es fiable el último escaño?</th>
+        <th>¿A quién se lo quita?</th>
+        <th class="col-conf" data-k="gap" title="Distancia al umbral D'Hondt del siguiente escaño">¿Cerca del sig.?</th>
+        <th class="col-track" data-k="tracking" title="¿Es fiable aplicar el mismo swing nacional a esta provincia? Se basa en cuánto se desvió la provincia del swing nacional en el ciclo 2019→2023.">Swing prov. fiable?</th>
+      </tr>
+    </thead>
     <tbody>${buildRows(data, sortKey, sortDir)}</tbody>
     <tfoot><tr>
       <td colspan="5" style="font-size:.79rem;opacity:.6">TOTAL 52 PROVINCIAS</td>
-      <td></td>
       <td class="r">
         <span class="${dCls}">${tot23}→${tot26}</span>
         <span class="${dCls}" style="font-size:.74rem;margin-left:4px">(${dStr})</span>
       </td>
-      <td colspan="2"></td>
+      <td colspan="4"></td>
     </tr></tfoot>
   </table>`;
 
@@ -388,9 +450,18 @@ function buildSummaryLine(party, data) {
   const diff = s.seats26 - s.seats23;
   const dStr = diff > 0 ? `+${diff}` : `${diff}`;
   const dCls = diff > 0 ? "gain" : diff < 0 ? "loss" : "same";
+
+  if (party.key === 'OTROS') {
+    return `<div class="section-summary">
+      <strong style="color:${party.color}">${party.label}</strong> ·
+      Estimación 2026: swing proporcional sobre 23J (ERC, Junts, PNV, BNG, CC, Na+, CUP…) ·
+      Escaños swing: <strong>${s.seats26}</strong>
+      (<span class="${dCls}">${dStr}</span> vs 2023)
+    </div>`;
+  }
+
   const tiers = {};
   data.forEach(r => { tiers[r.conf] = (tiers[r.conf] || 0) + 1; });
-  // Factor swing nacional: pct26 / pct23 (media ponderada implícita en el modelo)
   const avgP23 = data.reduce((a, r) => a + r.p23, 0) / data.length;
   const avgP26 = data.reduce((a, r) => a + r.p26, 0) / data.length;
   const factor = avgP23 > 0 ? (avgP26 / avgP23).toFixed(2) : "—";

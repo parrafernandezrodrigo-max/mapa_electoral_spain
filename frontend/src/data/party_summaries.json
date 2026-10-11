@@ -1,7 +1,7 @@
 {
   "VOX": {
     "seats23": 33,
-    "seats26": 65
+    "seats26": 66
   },
   "PP": {
     "seats23": 136,
@@ -15,8 +15,8 @@
     "seats23": 31,
     "seats26": 5
   },
-  "IZQ": {
-    "seats23": 31,
-    "seats26": 12
+  "OTROS": {
+    "seats23": 28,
+    "seats26": 37
   }
 }
