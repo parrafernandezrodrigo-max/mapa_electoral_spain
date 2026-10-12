@@ -124,16 +124,21 @@ const mainEl = (() => {
   let showSummary = false;
 
   // ── D'Hondt ──────────────────────────────────────────────────────
-  function dhondt(candidates, seats) {
-    if (!seats || !candidates.length) return {};
+  function dhondtFull(candidates, seats) {
+    if (!seats || !candidates.length) return { result: {}, lastQ: null, nextQ: null };
     const q = [];
     for (const c of candidates)
-      for (let d = 1; d <= seats; d++) q.push({ id: c.id, q: c.votes / d });
+      for (let d = 1; d <= seats; d++) q.push({ id: c.id, q: c.votes / d, divisor: d });
     q.sort((a, b) => b.q - a.q);
-    const out = {};
-    for (const { id } of q.slice(0, seats)) out[id] = (out[id] ?? 0) + 1;
-    return out;
+    const result = {};
+    for (const { id } of q.slice(0, seats)) result[id] = (result[id] ?? 0) + 1;
+    return {
+      result,
+      lastQ: q.length >= seats ? q[seats - 1] : null,
+      nextQ: q.length >  seats ? q[seats]     : null,
+    };
   }
+  function dhondt(candidates, seats) { return dhondtFull(candidates, seats).result; }
 
   function getEntries(cp) {
     const p  = convData[cp];
@@ -190,7 +195,8 @@ const mainEl = (() => {
       .filter(({ e }) => !e.isBlancos)
       .filter(({ i }) => pcts[i] >= threshold)
       .map(({ e, i }) => ({ id: e.id, votes: pcts[i] }));
-    return { sim: dhondt(cands, seats2026), entries, seats2026, seats2023 };
+    const { result: sim, lastQ, nextQ } = dhondtFull(cands, seats2026);
+    return { sim, entries, seats2026, seats2023, lastQ, nextQ, totalValid };
   }
 
   // ── Projection (estimated provs + 2023 for unvisited) ────────────
@@ -400,6 +406,33 @@ const mainEl = (() => {
       labelsRow.appendChild(chip);
     }
     tallyWrap.appendChild(labelsRow);
+
+    // ── Partido a partido (partidos con escaños en estimación) ───
+    const partyRow = document.createElement("div");
+    partyRow.style.cssText = "display:flex;gap:7px;flex-wrap:wrap;margin-top:.45rem;padding-top:.4rem;border-top:1px solid rgba(0,0,0,.07)";
+    const topParties  = Object.entries(byParty)
+      .filter(([id]) => !id.startsWith("__"))
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 12);
+    for (const [id, n] of topParties) {
+      let bloque = "otros";
+      for (const { cp: cp2 } of provList) {
+        const entry = (convData[cp2].partidos_con_escano ?? []).find(e => e.siglas === id);
+        if (entry?.bloque) { bloque = entry.bloque; break; }
+      }
+      const ep = extraParties.find(x => x.id === id);
+      if (ep?.bloque) bloque = ep.bloque;
+      const col  = COLORS[bloque] ?? "#999";
+      const real = real2023ByParty[id] ?? 0;
+      const d    = n - real;
+      const dStr = d === 0 ? "=" : (d > 0 ? `+${d}` : `${d}`);
+      const dCol = d > 0 ? "#2E7D32" : d < 0 ? "#C62828" : "#888";
+      const chip = document.createElement("span");
+      chip.style.cssText = `font-size:.72em;display:flex;align-items:center;gap:3px;padding:1px 6px;border-radius:3px;background:${col}18;border:1px solid ${col}44`;
+      chip.innerHTML = `<b style="color:${col}">${id}</b> <b>${n}</b> <span style="color:${dCol};font-size:.9em">(${dStr})</span>`;
+      partyRow.appendChild(chip);
+    }
+    if (topParties.length) tallyWrap.appendChild(partyRow);
   }
 
   // ── Root DOM ──────────────────────────────────────────────────────
@@ -419,13 +452,30 @@ const mainEl = (() => {
   function renderProgress() {
     progressWrap.innerHTML = "";
     const row = document.createElement("div");
-    row.style.cssText = "display:flex;align-items:center;gap:12px;margin-bottom:.45rem";
+    row.style.cssText = "display:flex;align-items:center;gap:10px;margin-bottom:.45rem;flex-wrap:wrap";
     const label = document.createElement("span");
     label.style.cssText = "font-size:.82em;opacity:.6;white-space:nowrap";
     label.textContent = showSummary
       ? `${provList.length} / ${provList.length} provincias completadas`
-      : `Provincia ${currentIdx + 1} de ${provList.length} · ${provList[currentIdx].nombre}`;
+      : `Provincia ${currentIdx + 1} de ${provList.length}`;
     row.appendChild(label);
+    if (!showSummary) {
+      const sel = document.createElement("select");
+      sel.style.cssText = "font-size:.8em;border:1px solid #d0d0d0;border-radius:4px;padding:2px 6px;background:transparent;cursor:pointer;max-width:220px";
+      for (let i = 0; i < provList.length; i++) {
+        const opt = document.createElement("option");
+        opt.value = i;
+        opt.textContent = (provState[provList[i].cp] ? "✓ " : "  ") + provList[i].nombre;
+        opt.selected = (i === currentIdx);
+        sel.appendChild(opt);
+      }
+      sel.addEventListener("change", () => {
+        currentIdx = +sel.value;
+        showSummary = false;
+        renderProgress(); renderCard(); window.scrollTo(0, 0);
+      });
+      row.appendChild(sel);
+    }
     progressWrap.appendChild(row);
     const track = document.createElement("div");
     track.style.cssText = "height:4px;background:#e0e0e0;border-radius:2px;overflow:hidden";
@@ -510,8 +560,13 @@ const mainEl = (() => {
 
     // Total counter
     const totalEl = document.createElement("div");
-    totalEl.style.cssText = "font-size:.82em;font-weight:600;padding:4px 10px;border-radius:5px;margin-bottom:.7rem;display:inline-block";
+    totalEl.style.cssText = "font-size:.82em;font-weight:600;padding:4px 10px;border-radius:5px;margin-bottom:.5rem;display:inline-block";
     card.appendChild(totalEl);
+
+    // Margen del último escaño (live)
+    const marginEl = document.createElement("div");
+    marginEl.style.cssText = "font-size:.78em;margin-bottom:.7rem;padding:.32rem .7rem;border-radius:5px;border-left:3px solid #bbb;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center";
+    card.appendChild(marginEl);
 
     // Grid container
     const gridWrap = document.createElement("div");
@@ -697,7 +752,7 @@ const mainEl = (() => {
 
     // ── Update ────────────────────────────────────────────────────
     function updateCard() {
-      const { sim, entries: ents, seats2026: s6, seats2023: s3 } = runDhondtProv(cp);
+      const { sim, entries: ents, seats2026: s6, seats2023: s3, lastQ, nextQ, totalValid } = runDhondtProv(cp);
       const total = pcts.reduce((s, v) => s + v, 0);
       const diff  = total - 100;
       const ok    = Math.abs(diff) < 0.1;
@@ -730,6 +785,37 @@ const mainEl = (() => {
       }
       barWrap.appendChild(buildSeatBar(`Real 2023 (${s3} esc)`, realByBlock, s3, 0.72));
       barWrap.appendChild(buildSeatBar(`Estimado 2026 (${s6} esc)`, simByBlock, s6, 0.92));
+
+      // ── Margen último escaño ──────────────────────────────────
+      if (lastQ && nextQ && totalValid > 0) {
+        const lastEntry = ents.find(e => e.id === lastQ.id);
+        const nextEntry = ents.find(e => e.id === nextQ.id);
+        const lastCol   = lastEntry?.bloque ? (COLORS[lastEntry.bloque] ?? '#999') : '#999';
+        const nextCol   = nextEntry?.bloque ? (COLORS[nextEntry.bloque] ?? '#999') : '#999';
+        // pp que necesita el challenger para arrebatar el escaño
+        const neededPp  = (lastQ.q - nextQ.q) * nextQ.divisor;
+        const isALFILO  = neededPp < 0.5;
+        const isAJUST   = neededPp >= 0.5 && neededPp < 2.0;
+        const borderCol = isALFILO ? '#C62828' : isAJUST ? '#E65100' : '#2E7D32';
+        const lbl       = isALFILO ? 'AL FILO' : isAJUST ? 'AJUSTADO' : 'SÓLIDO';
+        marginEl.style.borderLeftColor = borderCol;
+        marginEl.style.background      = borderCol + '0d';
+        marginEl.innerHTML =
+          `<span style="opacity:.5">Último esc.:</span> `+
+          `<b style="color:${lastCol}">${lastQ.id}</b> `+
+          `<span style="opacity:.4;font-size:.9em">÷${lastQ.divisor} → ${lastQ.q.toFixed(2)}%</span>`+
+          `<span style="opacity:.35;margin:0 2px">·</span>`+
+          `<span style="opacity:.5">Challenger:</span> `+
+          `<b style="color:${nextCol}">${nextQ.id}</b> `+
+          `<span style="opacity:.4;font-size:.9em">necesita </span>`+
+          `<b style="color:${borderCol}">+${neededPp.toFixed(2)}pp</b>`+
+          `<span style="opacity:.35;margin:0 2px">·</span>`+
+          `<span style="color:${borderCol};font-weight:700;font-size:.88em">${lbl}</span>`;
+      } else {
+        marginEl.style.borderLeftColor = '#ccc';
+        marginEl.style.background = 'transparent';
+        marginEl.innerHTML = '<span style="opacity:.3;font-size:.9em">Sin datos de margen</span>';
+      }
 
       // Update running tally
       renderTally();
