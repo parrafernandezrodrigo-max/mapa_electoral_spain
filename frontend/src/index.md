@@ -1,9 +1,9 @@
 ---
-title: Estimador provincial 2026
+title: Estimación 29-N
 ---
 
 <div style="text-align:center;margin:1.5rem 0 1.5rem">
-  <h1 style="font-size:2rem;font-weight:800;margin:0;line-height:1.1">Estimador provincial 2026</h1>
+  <h1 style="font-size:2rem;font-weight:800;margin:0;line-height:1.1">Estimación 29-N</h1>
   <p style="font-size:1.1rem;opacity:.65;margin:.4rem 0 0">Estima el resultado en cada provincia · D'Hondt con barrera 3%</p>
 </div>
 
@@ -124,16 +124,21 @@ const mainEl = (() => {
   let showSummary = false;
 
   // ── D'Hondt ──────────────────────────────────────────────────────
-  function dhondt(candidates, seats) {
-    if (!seats || !candidates.length) return {};
+  function dhondtFull(candidates, seats) {
+    if (!seats || !candidates.length) return { result: {}, lastQ: null, nextQ: null };
     const q = [];
     for (const c of candidates)
-      for (let d = 1; d <= seats; d++) q.push({ id: c.id, q: c.votes / d });
+      for (let d = 1; d <= seats; d++) q.push({ id: c.id, q: c.votes / d, divisor: d });
     q.sort((a, b) => b.q - a.q);
-    const out = {};
-    for (const { id } of q.slice(0, seats)) out[id] = (out[id] ?? 0) + 1;
-    return out;
+    const result = {};
+    for (const { id } of q.slice(0, seats)) result[id] = (result[id] ?? 0) + 1;
+    return {
+      result,
+      lastQ: q.length >= seats ? q[seats - 1] : null,
+      nextQ: q.length >  seats ? q[seats]     : null,
+    };
   }
+  function dhondt(candidates, seats) { return dhondtFull(candidates, seats).result; }
 
   function getEntries(cp) {
     const p  = convData[cp];
@@ -190,7 +195,8 @@ const mainEl = (() => {
       .filter(({ e }) => !e.isBlancos)
       .filter(({ i }) => pcts[i] >= threshold)
       .map(({ e, i }) => ({ id: e.id, votes: pcts[i] }));
-    return { sim: dhondt(cands, seats2026), entries, seats2026, seats2023 };
+    const { result: sim, lastQ, nextQ } = dhondtFull(cands, seats2026);
+    return { sim, entries, seats2026, seats2023, lastQ, nextQ, totalValid };
   }
 
   // ── Projection (estimated provs + 2023 for unvisited) ────────────
@@ -532,8 +538,13 @@ const mainEl = (() => {
 
     // Total counter
     const totalEl = document.createElement("div");
-    totalEl.style.cssText = "font-size:.82em;font-weight:600;padding:4px 10px;border-radius:5px;margin-bottom:.7rem;display:inline-block";
+    totalEl.style.cssText = "font-size:.82em;font-weight:600;padding:4px 10px;border-radius:5px;margin-bottom:.5rem;display:inline-block";
     card.appendChild(totalEl);
+
+    // Margen del último escaño (live)
+    const marginEl = document.createElement("div");
+    marginEl.style.cssText = "font-size:.78em;margin-bottom:.7rem;padding:.32rem .7rem;border-radius:5px;border-left:3px solid #bbb;background:rgba(0,0,0,.03);display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center";
+    card.appendChild(marginEl);
 
     // Grid container
     const gridWrap = document.createElement("div");
@@ -719,7 +730,7 @@ const mainEl = (() => {
 
     // ── Update ────────────────────────────────────────────────────
     function updateCard() {
-      const { sim, entries: ents, seats2026: s6, seats2023: s3 } = runDhondtProv(cp);
+      const { sim, entries: ents, seats2026: s6, seats2023: s3, lastQ, nextQ, totalValid } = runDhondtProv(cp);
       const total = pcts.reduce((s, v) => s + v, 0);
       const diff  = total - 100;
       const ok    = Math.abs(diff) < 0.1;
@@ -752,6 +763,36 @@ const mainEl = (() => {
       }
       barWrap.appendChild(buildSeatBar(`Real 2023 (${s3} esc)`, realByBlock, s3, 0.72));
       barWrap.appendChild(buildSeatBar(`Estimado 2026 (${s6} esc)`, simByBlock, s6, 0.92));
+
+      // ── Margen último escaño ──────────────────────────────────
+      if (lastQ && nextQ && totalValid > 0) {
+        const lastEntry = ents.find(e => e.id === lastQ.id);
+        const nextEntry = ents.find(e => e.id === nextQ.id);
+        const lastCol   = lastEntry?.bloque ? (COLORS[lastEntry.bloque] ?? '#999') : '#999';
+        const nextCol   = nextEntry?.bloque ? (COLORS[nextEntry.bloque] ?? '#999') : '#999';
+        const neededPp  = (lastQ.q - nextQ.q) * nextQ.divisor;
+        const isALFILO  = neededPp < 0.5;
+        const isAJUST   = neededPp >= 0.5 && neededPp < 2.0;
+        const borderCol = isALFILO ? '#C62828' : isAJUST ? '#E65100' : '#2E7D32';
+        const lbl       = isALFILO ? 'AL FILO' : isAJUST ? 'AJUSTADO' : 'SÓLIDO';
+        marginEl.style.borderLeftColor = borderCol;
+        marginEl.style.background      = borderCol + '0d';
+        marginEl.innerHTML =
+          `<span style="opacity:.5">Último esc.:</span> `+
+          `<b style="color:${lastCol}">${lastQ.id}</b> `+
+          `<span style="opacity:.4;font-size:.9em">÷${lastQ.divisor} → ${lastQ.q.toFixed(2)}pp</span>`+
+          `<span style="opacity:.35;margin:0 2px">·</span>`+
+          `<span style="opacity:.5">Challenger:</span> `+
+          `<b style="color:${nextCol}">${nextQ.id}</b> `+
+          `<span style="opacity:.4;font-size:.9em"> necesita </span>`+
+          `<b style="color:${borderCol}">+${neededPp.toFixed(2)}pp</b>`+
+          `<span style="opacity:.35;margin:0 2px">·</span>`+
+          `<span style="color:${borderCol};font-weight:700;font-size:.88em">${lbl}</span>`;
+      } else {
+        marginEl.style.borderLeftColor = '#bbb';
+        marginEl.style.background = 'rgba(0,0,0,.03)';
+        marginEl.innerHTML = '<span style="opacity:.45;font-size:.9em">Sin datos de margen</span>';
+      }
 
       // Update running tally
       renderTally();
