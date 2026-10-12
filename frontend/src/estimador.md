@@ -565,7 +565,7 @@ const mainEl = (() => {
 
     // Margen del último escaño (live)
     const marginEl = document.createElement("div");
-    marginEl.style.cssText = "font-size:.78em;margin-bottom:.7rem;padding:.32rem .7rem;border-radius:5px;border-left:3px solid #bbb;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center";
+    marginEl.style.cssText = "font-size:.78em;margin-bottom:.7rem;padding:.32rem .7rem;border-radius:5px;border-left:3px solid #bbb;background:rgba(0,0,0,.03);display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center";
     card.appendChild(marginEl);
 
     // Grid container
@@ -812,9 +812,9 @@ const mainEl = (() => {
           `<span style="opacity:.35;margin:0 2px">·</span>`+
           `<span style="color:${borderCol};font-weight:700;font-size:.88em">${lbl}</span>`;
       } else {
-        marginEl.style.borderLeftColor = '#ccc';
-        marginEl.style.background = 'transparent';
-        marginEl.innerHTML = '<span style="opacity:.3;font-size:.9em">Sin datos de margen</span>';
+        marginEl.style.borderLeftColor = '#bbb';
+        marginEl.style.background = 'rgba(0,0,0,.03)';
+        marginEl.innerHTML = '<span style="opacity:.45;font-size:.9em">⏳ Calculando margen…</span>';
       }
 
       // Update running tally
